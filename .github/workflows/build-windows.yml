@@ -30,6 +30,16 @@ jobs:
           if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9') { throw 'Source archive hash mismatch' }
           Expand-Archive -LiteralPath $zip -DestinationPath source
           Copy-Item -LiteralPath 'patches/diagnostics.py' -Destination 'source/PDF_Research_Engine_v0.2/diagnostics.py' -Force
+          # PyInstaller resolves data paths relative to the generated spec, not the stage.
+          $script = 'source/PDF_Research_Engine_v0.2/Build_Windows.ps1'
+          $build = Get-Content -Raw -LiteralPath $script
+          $old = "--add-data 'pdf_rules.yar;.' --add-data 'vendor/clamav;vendor/clamav' --add-data 'vendor/tessdata;vendor/tessdata'"
+          $new = '--add-data ((Join-Path $stage "pdf_rules.yar") + ";.") --add-data ($clamDir + ";vendor/clamav") --add-data ($tessDir + ";vendor/tessdata")'
+          if (-not $build.Contains($old)) { throw 'Expected PyInstaller data arguments not found' }
+          [System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $script).Path, $build.Replace($old,$new))
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }
           python -m py_compile 'source/PDF_Research_Engine_v0.2/diagnostics.py'
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic patch did not compile' }
       - name: Retrieve and verify official dependencies
