@@ -1,0 +1,54 @@
+name: Build Windows x64 prototype
+on:
+  push:
+    paths:
+      - PDF_Research_Engine_v0.2_source.zip
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Verify and unpack prototype source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = 'PDF_Research_Engine_v0.2_source.zip'
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne '4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9') { throw 'Unexpected source archive digest' }
+          Expand-Archive $archive -DestinationPath work
+      - name: Retrieve official dependencies with published digests
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'PDFResearchEngine-build' }
+          $release = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Cisco-Talos/clamav/releases/latest'
+          $asset = @($release.assets | Where-Object { $_.name -match '^clamav-[0-9.]+\.win\.x64\.zip$' })
+          if ($asset.Count -ne 1 -or $asset[0].digest -notmatch '^sha256:[0-9a-fA-F]{64}$') { throw 'No unambiguous official Windows x64 ZIP with published digest' }
+          $clamHash = $asset[0].digest.Substring(7)
+          Invoke-WebRequest -Uri $asset[0].browser_download_url -OutFile clamav.zip
+          if ((Get-FileHash clamav.zip -Algorithm SHA256).Hash -ne $clamHash) { throw 'ClamAV digest mismatch' }
+          $tess = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/tesseract-ocr/tessdata_fast/contents/eng.traineddata?ref=4.1.0'
+          if ($tess.sha -notmatch '^[0-9a-fA-F]{40}$') { throw 'No official Git blob identifier for OCR data' }
+          Invoke-WebRequest -Uri $tess.download_url -OutFile eng.traineddata
+          $blob = git hash-object eng.traineddata
+          if ($LASTEXITCODE -ne 0 -or $blob -ne $tess.sha) { throw 'OCR Git blob mismatch' }
+          $tessHash = (Get-FileHash eng.traineddata -Algorithm SHA256).Hash
+          $inventory = @{clamav_url=$asset[0].browser_download_url;clamav_sha256=$clamHash;tessdata_url=$tess.download_url;tessdata_git_blob=$tess.sha;tessdata_sha256=$tessHash}
+          $inventory | ConvertTo-Json | Set-Content build-inputs.json
+          $root = Join-Path $PWD 'work/PDF_Research_Engine_v0.2'
+          & (Join-Path $root 'Build_Windows.ps1') -ClamAVZip (Resolve-Path clamav.zip).Path -ClamAVSHA256 $clamHash -EnglishTessdata (Resolve-Path eng.traineddata).Path -TessdataSHA256 $tessHash -LiveTest
+          Copy-Item build-inputs.json (Join-Path $root 'dist/BUILD_INPUTS.json')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDFResearchEngine-Windows-x64-experimental
+          path: work/PDF_Research_Engine_v0.2/dist/
+          if-no-files-found: error
