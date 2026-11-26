@@ -5,6 +5,7 @@ on:
     paths:
       - 'PDF_Research_Engine_v0.2_source*.zip'
       - '.github/workflows/build-windows.yml'
+      - 'patches/**'
 permissions:
   contents: read
 concurrency:
@@ -28,6 +29,9 @@ jobs:
           if (Test-Path -LiteralPath 'PDF_Research_Engine_v0.2_source.zip') { $zip = 'PDF_Research_Engine_v0.2_source.zip' }
           if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9') { throw 'Source archive hash mismatch' }
           Expand-Archive -LiteralPath $zip -DestinationPath source
+          Copy-Item -LiteralPath 'patches/diagnostics.py' -Destination 'source/PDF_Research_Engine_v0.2/diagnostics.py' -Force
+          python -m py_compile 'source/PDF_Research_Engine_v0.2/diagnostics.py'
+          if ($LASTEXITCODE -ne 0) { throw 'Diagnostic patch did not compile' }
       - name: Retrieve and verify official dependencies
         shell: pwsh
         env:
