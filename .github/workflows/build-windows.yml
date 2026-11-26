@@ -63,7 +63,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $root = (Get-Location).Path
           $src = Join-Path $root 'source/PDF_Research_Engine_v0.2'
-          & (Join-Path $src 'Build_Windows.ps1') -ClamAVZip (Join-Path $root 'clamav.zip') -ClamAVSHA256 $env:CLAM_HASH -EnglishTessdata (Join-Path $root 'eng.traineddata') -TessdataSHA256 $env:TESS_HASH -LiveTest
+          try {
+            & (Join-Path $src 'Build_Windows.ps1') -ClamAVZip (Join-Path $root 'clamav.zip') -ClamAVSHA256 $env:CLAM_HASH -EnglishTessdata (Join-Path $root 'eng.traineddata') -TessdataSHA256 $env:TESS_HASH -LiveTest
+          } finally {
+            Get-ChildItem -LiteralPath $src -Directory -Filter '.build-win-*' | ForEach-Object {
+              foreach ($name in @('source-diagnostics.json','packaged-diagnostics.json')) {
+                $report = Join-Path $_.FullName $name
+                if (Test-Path -LiteralPath $report) { Write-Host "Diagnostic report: $name"; Get-Content -Raw -LiteralPath $report | Write-Host }
+              }
+            }
+          }
           Copy-Item BUILD_INPUTS.json (Join-Path $src 'dist/BUILD_INPUTS.json')
       - name: Upload experimental build
         uses: actions/upload-artifact@v4
