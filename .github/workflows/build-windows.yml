@@ -1,0 +1,72 @@
+name: Build PDF Research Engine (Windows x64)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - PDF_Research_Engine_v0.2_source.zip
+permissions:
+  contents: read
+concurrency:
+  group: pdfresearch-windows-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Verify and extract source archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = 'PDF_Research_Engine_v0.2_source.zip'
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9') { throw 'Source archive hash mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath source
+      - name: Retrieve and verify official dependencies
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+          $release = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Cisco-Talos/clamav/releases/latest'
+          $assets = @($release.assets | Where-Object { $_.name -match '^clamav-.+\.win\.x64\.zip$' })
+          if ($assets.Count -ne 1) { throw 'Expected one official ClamAV Windows x64 ZIP' }
+          $asset = $assets[0]
+          if ($asset.digest -notmatch '^sha256:([a-fA-F0-9]{64})$') { throw 'Official GitHub asset SHA256 is unavailable' }
+          $clamHash = $Matches[1]
+          if ($asset.browser_download_url -notmatch '^https://github\.com/Cisco-Talos/clamav/releases/download/[^?#]+\.zip$') { throw 'Unexpected ClamAV asset origin' }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile clamav.zip
+          if ((Get-FileHash -LiteralPath clamav.zip -Algorithm SHA256).Hash -ne $clamHash) { throw 'ClamAV digest mismatch' }
+          $repo = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/tesseract-ocr/tessdata_fast'
+          $commit = Invoke-RestMethod -Headers $headers -Uri ("https://api.github.com/repos/tesseract-ocr/tessdata_fast/commits/" + $repo.default_branch)
+          $revision = $commit.sha
+          if ($revision -notmatch '^[a-f0-9]{40}$') { throw 'Invalid upstream commit SHA' }
+          $meta = Invoke-RestMethod -Headers $headers -Uri ("https://api.github.com/repos/tesseract-ocr/tessdata_fast/contents/eng.traineddata?ref=" + $revision)
+          $tessUrl = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/$revision/eng.traineddata"
+          Invoke-WebRequest -Uri $tessUrl -OutFile eng.traineddata
+          $blob = (git hash-object --no-filters eng.traineddata).Trim()
+          if ($LASTEXITCODE -ne 0 -or $blob -ne $meta.sha) { throw 'English OCR data Git blob hash mismatch' }
+          $tessHash = (Get-FileHash -LiteralPath eng.traineddata -Algorithm SHA256).Hash
+          @{ clamav_release = $release.tag_name; clamav_url = $asset.browser_download_url; clamav_sha256 = $clamHash; tessdata_revision = $revision; tessdata_url = $tessUrl; tessdata_sha256 = $tessHash } | ConvertTo-Json | Set-Content -Encoding utf8 BUILD_INPUTS.json
+          "CLAM_HASH=$clamHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "TESS_HASH=$tessHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Compile and run actual scanner diagnostics
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = (Get-Location).Path
+          $src = Join-Path $root 'source/PDF_Research_Engine_v0.2'
+          & (Join-Path $src 'Build_Windows.ps1') -ClamAVZip (Join-Path $root 'clamav.zip') -ClamAVSHA256 $env:CLAM_HASH -EnglishTessdata (Join-Path $root 'eng.traineddata') -TessdataSHA256 $env:TESS_HASH -LiveTest
+          Copy-Item BUILD_INPUTS.json (Join-Path $src 'dist/BUILD_INPUTS.json')
+      - name: Upload experimental build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDFResearchEngine-Windows-x64-experimental
+          path: source/PDF_Research_Engine_v0.2/dist/
+          if-no-files-found: error
+          retention-days: 7
