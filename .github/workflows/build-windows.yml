@@ -38,17 +38,9 @@ jobs:
           $new = '--add-data ((Join-Path $stage "pdf_rules.yar") + ";.") --add-data ($clamDir + ";vendor/clamav") --add-data ($tessDir + ";vendor/tessdata")'
           if (-not $build.Contains($old)) { throw 'Expected PyInstaller data arguments not found' }
           $build = $build.Replace($old,$new)
-          $diagnosticOld = @'
-    $proc = Start-Process -FilePath $candidate -ArgumentList @($mode, ('"' + $packagedReport + '"')) -PassThru -Wait
-    if ($proc.ExitCode -ne 0 -or -not (Test-Path $packagedReport)) { throw 'Packaged diagnostic failed. Inspect the temporary build folder.' }
-'@
-          $diagnosticNew = @'
-    & (Join-Path $env:GITHUB_WORKSPACE 'ci/Run-StandardUserDiagnostic.ps1') -Candidate $candidate -Mode $mode -Report $packagedReport
-    if (-not (Test-Path -LiteralPath $packagedReport)) { throw 'Packaged diagnostic report missing.' }
-'@
+          $diagnosticOld = @('    $proc = Start-Process -FilePath $candidate -ArgumentList @($mode, (''"'' + $packagedReport + ''"'')) -PassThru -Wait', '    if ($proc.ExitCode -ne 0 -or -not (Test-Path $packagedReport)) { throw ''Packaged diagnostic failed. Inspect the temporary build folder.'' }') -join "`n"
+          $diagnosticNew = @('    & (Join-Path $env:GITHUB_WORKSPACE ''ci/Run-StandardUserDiagnostic.ps1'') -Candidate $candidate -Mode $mode -Report $packagedReport', '    if (-not (Test-Path -LiteralPath $packagedReport)) { throw ''Packaged diagnostic report missing.'' }') -join "`n"
           $build = $build.Replace("`r`n","`n")
-          $diagnosticOld = $diagnosticOld.Replace("`r`n","`n")
-          $diagnosticNew = $diagnosticNew.Replace("`r`n","`n")
           if (-not $build.Contains($diagnosticOld)) { throw 'Expected packaged diagnostic invocation not found' }
           [System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $script).Path, $build.Replace($diagnosticOld,$diagnosticNew))
           $tokens = $null; $errors = $null
