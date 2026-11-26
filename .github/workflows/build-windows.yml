@@ -6,6 +6,7 @@ on:
       - 'PDF_Research_Engine_v0.2_source*.zip'
       - '.github/workflows/build-windows.yml'
       - 'patches/**'
+      - 'ci/**'
 permissions:
   contents: read
 concurrency:
@@ -36,7 +37,20 @@ jobs:
           $old = "--add-data 'pdf_rules.yar;.' --add-data 'vendor/clamav;vendor/clamav' --add-data 'vendor/tessdata;vendor/tessdata'"
           $new = '--add-data ((Join-Path $stage "pdf_rules.yar") + ";.") --add-data ($clamDir + ";vendor/clamav") --add-data ($tessDir + ";vendor/tessdata")'
           if (-not $build.Contains($old)) { throw 'Expected PyInstaller data arguments not found' }
-          [System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $script).Path, $build.Replace($old,$new))
+          $build = $build.Replace($old,$new)
+          $diagnosticOld = @'
+    $proc = Start-Process -FilePath $candidate -ArgumentList @($mode, ('"' + $packagedReport + '"')) -PassThru -Wait
+    if ($proc.ExitCode -ne 0 -or -not (Test-Path $packagedReport)) { throw 'Packaged diagnostic failed. Inspect the temporary build folder.' }
+'@
+          $diagnosticNew = @'
+    & (Join-Path $env:GITHUB_WORKSPACE 'ci/Run-StandardUserDiagnostic.ps1') -Candidate $candidate -Mode $mode -Report $packagedReport
+    if (-not (Test-Path -LiteralPath $packagedReport)) { throw 'Packaged diagnostic report missing.' }
+'@
+          $build = $build.Replace("`r`n","`n")
+          $diagnosticOld = $diagnosticOld.Replace("`r`n","`n")
+          $diagnosticNew = $diagnosticNew.Replace("`r`n","`n")
+          if (-not $build.Contains($diagnosticOld)) { throw 'Expected packaged diagnostic invocation not found' }
+          [System.IO.File]::WriteAllText((Resolve-Path -LiteralPath $script).Path, $build.Replace($diagnosticOld,$diagnosticNew))
           $tokens = $null; $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { throw ($errors | Out-String) }
