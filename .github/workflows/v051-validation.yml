@@ -1,0 +1,170 @@
+name: v0.5.1 development validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'v051/**'
+      - '.github/workflows/v051-validation.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pdfresearch-v051-validation
+  cancel-in-progress: true
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare exact baseline and desktop overlay
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:v03)" = f7d0376ef421050ed1c494495b04e081cac417c7
+          test "$(git rev-parse HEAD:v04)" = 02d161c05020bb83c3d60efe31c6cd716bb8f017
+          test "$(git rev-parse HEAD:v05)" = f243bf58aea873cd30b82ab5da1137982dd9180e
+          python -c 'import hashlib,zipfile; from pathlib import Path; p=Path("PDF_Research_Engine_v0.2_source (1).zip"); assert hashlib.sha256(p.read_bytes()).hexdigest()=="4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9"; zipfile.ZipFile(p).extractall("source")'
+          python v051/prepare.py source/PDF_Research_Engine_v0.2
+          python -m compileall -q source/PDF_Research_Engine_v0.2
+      - name: Install test-only native dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb tesseract-ocr-eng
+          python -m pip install --only-binary=:all: pymupdf yara-python
+      - name: Security and desktop regression tests
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -m unittest -v test_engine test_security test_discovery_v03 test_desktop_v04 test_repositories_v05 test_relevance_v051
+      - name: Desktop smoke test in isolated display
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: |
+          xvfb-run -a python - <<'PY'
+          import tempfile, pathlib, tkinter as tk, unittest.mock as mock
+          import app
+          from desktop_v05 import repository_desktop
+          with tempfile.TemporaryDirectory() as td:
+              app.ROOT=pathlib.Path(td)
+              with mock.patch.object(app.App,'check_security',lambda self:None):
+                  root=tk.Tk()
+                  gui=repository_desktop(app.App)(root)
+                  root.update()
+                  assert gui.searchbtn.cget('text')=='Search'
+                  assert not hasattr(gui,'catalog_window') and not hasattr(gui,'open_reader')
+                  assert not pathlib.Path('reader_v04.py').exists() and not pathlib.Path('catalog_v04.py').exists()
+                  entries=[x for x in __import__('desktop_v04').walk(gui.discovery) if isinstance(x,tk.ttk.Entry) and str(x.cget('textvariable'))==str(gui.q)]
+                  assert len(entries)==1 and entries[0].bind('<Return>')
+                  assert set(app.DEFAULT_PROVIDERS)=={p for p,v in gui.providers.items() if v.get()}
+                  from desktop_v04 import WHEEL_TAG
+                  import time
+                  assert gui.textsize.get()==14 and gui.size_label.get()=='14 pt'
+                  gui.prefs['hide_welcome']=True
+                  gui.plus.invoke();assert gui.textsize.get()==15
+                  gui.minus.invoke();assert gui.textsize.get()==14
+                  assert WHEEL_TAG in entries[0].bindtags()
+                  entries[0].event_generate('<MouseWheel>',delta=120,state=4);root.update()
+                  assert gui.textsize.get()==15
+                  entries[0].event_generate('<MouseWheel>',delta=-120,state=4);root.update()
+                  assert gui.textsize.get()==14
+                  gui.resize_text(24);root.update()
+                  assert gui.content_parent.winfo_height()>0
+                  assert gui.normalfont.cget('size')==24 and gui.size_label.get()=='24 pt'
+                  assert gui.plus.instate(['disabled'])
+                  root.geometry('800x420');root.update()
+                  canvas=gui.content_parent.master
+                  canvas.yview_moveto(0);root.update()
+                  assert canvas.yview()[1]<1,canvas.yview()
+                  entries[0].event_generate('<MouseWheel>',delta=-120);root.update()
+                  assert canvas.yview()[0]>0,canvas.yview()
+                  entries[0].event_generate('<MouseWheel>',delta=120);root.update()
+                  assert canvas.yview()[0]==0,canvas.yview()
+                  for ratio in (1.0,1.25,1.5,2.0):
+                      root.tk.call('tk','scaling',ratio*96/72)
+                      gui.apply_fonts();root.update()
+                      assert gui.size_label.get()=='24 pt' and canvas.yview()[1]<1
+                  gui.reset_text();root.update();assert gui.textsize.get()==14
+                  gui.resize_text(18);gui.persist()
+                  from desktop_helpers import load_preferences
+                  assert load_preferences(gui.prefpath)['text_size']==18
+                  gui.reset_text()
+                  gui.welcome();root.update()
+                  assert gui.guide.winfo_exists()
+                  gui.guide.destroy()
+                  gui.show_monitor();gui.monitor.begin(['Test document']*10)
+                  gui.monitor.event('batch_row',(0,'Active','Checking staged PDF'))
+                  gui.monitor.event('batch_row',(0,'Completed','Indexed'))
+                  gui.monitor.event('batch_end',True)
+                  assert gui.monitor.states.count('Completed')==1
+                  assert gui.monitor.states.count('Cancelled')==9
+                  m=gui.monitor
+                  assert m.timer is None and m.win.state()!='withdrawn'
+                  m.begin(['Success'])
+                  m.event('batch_log','ClamAV scanning staged PDF')
+                  assert m.head.get()=='Virus scanning' and 'ClamAV' not in m.log.get('1.0','end')
+                  m.event('batch_log','Rasterization and OCR: page 2 of 3')
+                  assert 'page 2 of 3' in m.head.get() and 'OCR' not in m.head.get()
+                  m.advanced.set(True);m.refresh_log()
+                  assert 'Rasterization and OCR' in m.log.get('1.0','end')
+                  m.advanced.set(False);m.refresh_log()
+                  m.event('batch_row',(0,'Completed','Added to your library'))
+                  m.event('batch_end',False)
+                  assert m.timer is not None and '5 second' in m.countdown.get()
+                  deadline=time.monotonic()+5.6
+                  while time.monotonic()<deadline and m.win.state()!='withdrawn':
+                      root.update();time.sleep(.02)
+                  assert m.win.state()=='withdrawn'
+                  m.show();root.update()
+                  assert m.states==['Completed'] and m.timer is None and 'Added to your library' in m.log.get('1.0','end')
+                  for outcome in ('Blocked','Failed'):
+                      m.begin([outcome]);m.event('batch_row',(0,outcome,'Not released'));m.event('batch_end',False)
+                      assert m.timer is None and m.win.state()!='withdrawn'
+                  m.begin(['New batch']);m.event('batch_row',(0,'Completed','Saved'));m.event('batch_end',False)
+                  assert m.timer is not None
+                  m.begin(['Another batch']);assert m.timer is None
+                  m.auto_close.set(False);m.change_auto_close()
+                  m.event('batch_row',(0,'Completed','Saved'));m.event('batch_end',False)
+                  assert m.timer is None and m.win.state()!='withdrawn'
+                  assert load_preferences(gui.prefpath)['monitor_auto_close'] is False
+                  gui.repository_window();root.update()
+                  assert gui.repo_window.winfo_exists() and gui.source_summary.get()=='3 selected'
+                  assert gui.result_limit.get()=='100'
+                  assert set(gui.repository_choices)>={'zenodo','government-attic'}
+                  gui.repository_choices['zenodo'].set(True)
+                  from desktop_v04 import walk
+                  apply=next(x for x in walk(gui.repo_window) if isinstance(x,tk.ttk.Button) and x.cget('text')=='Apply selection')
+                  with mock.patch('desktop_v05.messagebox.askyesno',return_value=False):
+                      apply.invoke()
+                  assert 'zenodo' not in gui.selected_sources and 'zenodo.org' not in gui.hosts
+                  with mock.patch('desktop_v05.messagebox.askyesno',return_value=True):
+                      apply.invoke()
+                  assert 'zenodo' in gui.selected_sources and 'zenodo.org' in gui.hosts
+                  assert load_preferences(gui.config)['hosts']==gui.hosts
+                  assert 'zenodo' in load_preferences(gui.prefpath)['repositories_v05']
+                  gui.result_limit.set('500');gui.save_limit()
+                  assert load_preferences(gui.prefpath)['result_limit']==500
+                  assert gui.depth.get()=='Balanced'
+                  gui.q.set('Hatred in Society');gui.generate()
+                  assert 'prejudice' in gui.termtext.get('1.0','end') and 'social structure' not in gui.termtext.get('1.0','end')
+                  assert 'relevance' in gui.tree.cget('columns')
+                  gui.required_terms.set('conflict');gui.excluded_terms.set('fiction')
+                  from repositories_v05 import Document
+                  item=Document('Hatred and conflict','https://zenodo.org/a.pdf','Zenodo',relevance=86,match_reason='Direct: hatred')
+                  assert gui.row(item)[-2:]==('86','Direct: hatred')
+                  gui.events.put(('result',item));gui.poll();root.update()
+                  gui.tree.selection_set(gui.tree.get_children()[0]);gui.selection()
+                  assert 'Direct: hatred' in gui.match_details.get()
+                  gui.persist();root.destroy()
+          print('Desktop smoke test passed; not a clean Windows desktop test.')
+          PY
+
+      - name: Live new repository validation
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -u live_repositories_v05.py
+      - name: Preserve new repository evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v051-linux-repository-reports
+          path: source/PDF_Research_Engine_v0.2/live-repositories-v05.json
+          if-no-files-found: warn
+          retention-days: 14

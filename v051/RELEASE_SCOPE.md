@@ -1,0 +1,2 @@
+# v0.5.1
+Metadata-only relevance against original topic, reviewed aliases, three modes, required/excluded phrases, ranked scores, conservative cross-source DOI or title+author+year grouping with alternate locations, additive cache migration. No new repositories, no raw PDF parsing, no changes to security or size limit. Results emitted in ranked order at search completion. Limited reviewed synonym vocabulary, not general semantic AI. Tests include the fairy-tale example and live original topic investigation.
