@@ -1,4 +1,4 @@
-name: Build PDF Research Engine v0.4 (gated)
+name: Build PDF Research Engine v0.4.1 (gated)
 on:
   workflow_run:
     workflows: ["v0.4 development validation"]
@@ -159,11 +159,11 @@ jobs:
             }
           }
           Copy-Item BUILD_INPUTS.json (Join-Path $src 'dist/BUILD_INPUTS.json')
-          @{ version = '0.4'; validation_run = "${{ github.event.workflow_run.id }}"; build_commit = "${{ github.event.workflow_run.head_sha }}"; live_validated_defaults = @('ERIC','NASA NTRS','arXiv'); retrieval_report = 'v04-windows-retrieval-reports'; scope = 'usability only; reader and expanded catalog deferred'; distribution = 'experimental unsigned development build' } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $src 'dist/RETRIEVAL_VALIDATION.json')
+          @{ version = '0.4.1'; validation_run = "${{ github.event.workflow_run.id }}"; build_commit = "${{ github.event.workflow_run.head_sha }}"; live_validated_defaults = @('ERIC','NASA NTRS','arXiv'); retrieval_report = 'v04-windows-retrieval-reports'; scope = 'usability only; reader and expanded catalog deferred'; distribution = 'experimental unsigned development build' } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $src 'dist/RETRIEVAL_VALIDATION.json')
       - name: Upload experimental build
         uses: actions/upload-artifact@v4
         with:
-          name: PDFResearchEngine-v0.4-Windows-x64-experimental
+          name: PDFResearchEngine-v0.4.1-Windows-x64-experimental
           path: source/PDF_Research_Engine_v0.2/dist/
           if-no-files-found: error
           retention-days: 7
@@ -176,7 +176,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: PDFResearchEngine-v0.4-Windows-x64-experimental
+          name: PDFResearchEngine-v0.4.1-Windows-x64-experimental
           path: dist
       - name: Attach standalone executable to private-to-maintainers draft
         env:
@@ -188,4 +188,4 @@ jobs:
           set -euo pipefail
           test -s dist/PDFResearchEngine.exe
           test -s dist/SHA256.txt
-          gh release create "v0.4-experimental-${RUN_ID}" --draft --target "$VALIDATED_SHA" --title "PDF Research Engine v0.4 experimental development build" --notes "Unsigned experimental build for repository-maintainer testing only. Public redistribution requires licensing and clean Windows desktop review. The standalone executable contains runtime dependencies. Build reports and corresponding source are retained separately." dist/PDFResearchEngine.exe dist/SHA256.txt
+          gh release create "v0.4.1-experimental-${RUN_ID}" --draft --target "$VALIDATED_SHA" --title "PDF Research Engine v0.4.1 experimental development build" --notes "Unsigned experimental build for repository-maintainer testing only. Public redistribution requires licensing and clean Windows desktop review. The standalone executable contains runtime dependencies. Build reports and corresponding source are retained separately." dist/PDFResearchEngine.exe dist/SHA256.txt

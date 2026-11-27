@@ -44,3 +44,24 @@ class DesktopTests(unittest.TestCase):
             self.assertFalse((fixture.root/'processed').exists())
             self.assertTrue(any('quarantine' in msg for msg in events))
         finally:fixture.doCleanups()
+
+    def test_plain_language_preserves_distinct_security_stages(self):
+        from desktop_v04 import plain_stage
+        self.assertEqual(plain_stage('ClamAV scanning staged PDF'),'Virus scanning')
+        self.assertEqual(plain_stage('ClamAV scanning reconstructed PDF'),'Final virus scan')
+        self.assertEqual(plain_stage('Rasterization and OCR: page 2 of 5'),'Rebuilding document and making text searchable: page 2 of 5')
+        self.assertEqual(plain_stage('Checking original PDF structure'),'Checking document safety')
+        self.assertEqual(plain_stage('Unrecognized scanner error'),'Unrecognized scanner error')
+    def test_font_default_bounds_and_wheel(self):
+        from desktop_v04 import font_size, wheel_steps
+        from types import SimpleNamespace
+        self.assertEqual(font_size(None),14)
+        self.assertEqual(font_size(18),18)
+        self.assertEqual(font_size(99),24)
+        self.assertEqual(font_size(0),10)
+        self.assertEqual(font_size('nan'),14)
+        self.assertEqual(wheel_steps(SimpleNamespace(delta=120)),1)
+        self.assertEqual(wheel_steps(SimpleNamespace(delta=-240)),-2)
+        self.assertEqual(wheel_steps(SimpleNamespace(delta=-15)),-1)
+        self.assertEqual(wheel_steps(SimpleNamespace(num=4)),1)
+        self.assertEqual(wheel_steps(SimpleNamespace(num=5)),-1)

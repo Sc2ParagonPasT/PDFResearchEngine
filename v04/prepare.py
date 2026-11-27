@@ -15,7 +15,7 @@ def change(s,a,b):
 p=root/'app.py';s=p.read_text(encoding='utf-8')
 s=change(s,'shell=ttk.Frame(self.win,padding=18)','shell=ttk.Frame(getattr(self,"content_parent",self.win),padding=18)')
 s=change(s,"root=tk.Tk()\n        try:\n            with single_instance(ROOT):App(root).win.mainloop()","root=tk.Tk()\n        from desktop_v04 import desktop_class\n        try:\n            with single_instance(ROOT):desktop_class(App)(root).win.mainloop()")
-s=s.replace('v0.3','v0.4')
+s=s.replace('v0.3','v0.4.1')
 p.write_text(s,encoding='utf-8')
 p=root/'security.py';s=p.read_text(encoding='utf-8')
 s=change(s,"def reconstruct(src,dest):","def reconstruct(src,dest,report=lambda *_:None):")

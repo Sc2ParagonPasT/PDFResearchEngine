@@ -53,10 +53,38 @@ jobs:
                   entries=[x for x in __import__('desktop_v04').walk(gui.discovery) if isinstance(x,tk.ttk.Entry) and str(x.cget('textvariable'))==str(gui.q)]
                   assert len(entries)==1 and entries[0].bind('<Return>')
                   assert set(app.DEFAULT_PROVIDERS)=={p for p,v in gui.providers.items() if v.get()}
+                  from desktop_v04 import WHEEL_TAG
+                  import time
+                  assert gui.textsize.get()==14 and gui.size_label.get()=='14 pt'
+                  gui.prefs['hide_welcome']=True
+                  gui.plus.invoke();assert gui.textsize.get()==15
+                  gui.minus.invoke();assert gui.textsize.get()==14
+                  assert WHEEL_TAG in entries[0].bindtags()
+                  entries[0].event_generate('<MouseWheel>',delta=120,state=4);root.update()
+                  assert gui.textsize.get()==15
+                  entries[0].event_generate('<MouseWheel>',delta=-120,state=4);root.update()
+                  assert gui.textsize.get()==14
                   gui.resize_text(24);root.update()
                   assert gui.content_parent.winfo_height()>0
-                  assert gui.normalfont.cget('size')==24
-                  gui.resize_text(13)
+                  assert gui.normalfont.cget('size')==24 and gui.size_label.get()=='24 pt'
+                  assert gui.plus.instate(['disabled'])
+                  root.geometry('800x420');root.update()
+                  canvas=gui.content_parent.master
+                  canvas.yview_moveto(0);root.update()
+                  assert canvas.yview()[1]<1,canvas.yview()
+                  entries[0].event_generate('<MouseWheel>',delta=-120);root.update()
+                  assert canvas.yview()[0]>0,canvas.yview()
+                  entries[0].event_generate('<MouseWheel>',delta=120);root.update()
+                  assert canvas.yview()[0]==0,canvas.yview()
+                  for ratio in (1.0,1.25,1.5,2.0):
+                      root.tk.call('tk','scaling',ratio*96/72)
+                      gui.apply_fonts();root.update()
+                      assert gui.size_label.get()=='24 pt' and canvas.yview()[1]<1
+                  gui.reset_text();root.update();assert gui.textsize.get()==14
+                  gui.resize_text(18);gui.persist()
+                  from desktop_helpers import load_preferences
+                  assert load_preferences(gui.prefpath)['text_size']==18
+                  gui.reset_text()
                   gui.welcome();root.update()
                   assert gui.guide.winfo_exists()
                   gui.guide.destroy()
@@ -66,6 +94,35 @@ jobs:
                   gui.monitor.event('batch_end',True)
                   assert gui.monitor.states.count('Completed')==1
                   assert gui.monitor.states.count('Cancelled')==9
+                  m=gui.monitor
+                  assert m.timer is None and m.win.state()!='withdrawn'
+                  m.begin(['Success'])
+                  m.event('batch_log','ClamAV scanning staged PDF')
+                  assert m.head.get()=='Virus scanning' and 'ClamAV' not in m.log.get('1.0','end')
+                  m.event('batch_log','Rasterization and OCR: page 2 of 3')
+                  assert 'page 2 of 3' in m.head.get() and 'OCR' not in m.head.get()
+                  m.advanced.set(True);m.refresh_log()
+                  assert 'Rasterization and OCR' in m.log.get('1.0','end')
+                  m.advanced.set(False);m.refresh_log()
+                  m.event('batch_row',(0,'Completed','Added to your library'))
+                  m.event('batch_end',False)
+                  assert m.timer is not None and '5 second' in m.countdown.get()
+                  deadline=time.monotonic()+5.6
+                  while time.monotonic()<deadline and m.win.state()!='withdrawn':
+                      root.update();time.sleep(.02)
+                  assert m.win.state()=='withdrawn'
+                  m.show();root.update()
+                  assert m.states==['Completed'] and m.timer is None and 'Added to your library' in m.log.get('1.0','end')
+                  for outcome in ('Blocked','Failed'):
+                      m.begin([outcome]);m.event('batch_row',(0,outcome,'Not released'));m.event('batch_end',False)
+                      assert m.timer is None and m.win.state()!='withdrawn'
+                  m.begin(['New batch']);m.event('batch_row',(0,'Completed','Saved'));m.event('batch_end',False)
+                  assert m.timer is not None
+                  m.begin(['Another batch']);assert m.timer is None
+                  m.auto_close.set(False);m.change_auto_close()
+                  m.event('batch_row',(0,'Completed','Saved'));m.event('batch_end',False)
+                  assert m.timer is None and m.win.state()!='withdrawn'
+                  assert load_preferences(gui.prefpath)['monitor_auto_close'] is False
                   gui.persist();root.destroy()
           print('Desktop smoke test passed; not a clean Windows desktop test.')
           PY
