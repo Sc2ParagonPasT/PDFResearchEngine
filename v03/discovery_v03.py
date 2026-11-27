@@ -15,6 +15,20 @@ MAX_CANDIDATES = 100
 MAX_RESULTS = 50
 
 class Network(base.Network):
+    def json(self, url):
+        # Retry only transient read/connection timeouts, once; preserve all URL/DNS/TLS checks.
+        for attempt in range(2):
+            try:
+                data = super().json(url)
+                if not isinstance(data, dict):
+                    raise ValueError('Unexpected repository response type')
+                if data.get('error'):
+                    raise ValueError('Repository API error: '+str(data['error'])[:180])
+                return data
+            except TimeoutError:
+                if attempt: raise
+                time.sleep(1)
+
     def probe(self, url):
         # Use the same full GET as download, but close after reading 1024 bytes.
         # Some servers refuse Range; a successful range request also need not imply GET works.
@@ -44,7 +58,7 @@ def discover(net, provider, term):
             return
         items.append(Result(base.safe_title(title), url, provider, str(year or '')[:10], term))
     if provider == 'ERIC':
-        data = net.json('https://api.ies.ed.gov/eric/?'+urlencode({'search': '('+term+') AND fulltext:"T"', 'format':'json','rows':15,'start':0}))
+        data = net.json('https://api.ies.ed.gov/eric/?'+urlencode({'search':term, 'format':'json','rows':40,'start':0}))
         for d in data.get('response',{}).get('docs',[]):
             flag = d.get('fulltext')
             if flag is not None and str(flag).lower() not in ('t','true','1','yes'):
@@ -60,7 +74,7 @@ def discover(net, provider, term):
                     add(d.get('title'),u.get('url'),d.get('pubYear'))
             # No speculative identifier-to-PDF URL construction.
     elif provider == 'NASA NTRS':
-        data = net.json('https://ntrs.nasa.gov/api/citations/search?'+urlencode({'searchTerm':term,'page.size':15}))
+        data = net.json('https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':term,'downloadsAvailable':'true','page.size':40,'page.from':0}))
         for d in data.get('results',[]):
             for download in d.get('downloads',[]) or []:
                 links = download.get('links') or {}
@@ -82,7 +96,7 @@ def discover(net, provider, term):
                             add(d.get('title'),urljoin('https://www.loc.gov/',f['url']),d.get('date'))
     else:
         return base.discover(net,provider,term)
-    return items[:15]
+    return items[:40]
 
 
 def run_search(net, providers, terms, seeds, stop, emit):

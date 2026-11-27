@@ -43,8 +43,8 @@ def inspect_metadata():
     import discovery_v03 as discovery
     queries = [
         ('ERIC baseline','https://api.ies.ed.gov/eric/?'+urlencode({'search':'reading comprehension','format':'json','rows':3,'start':0})),
-        ('ERIC filtered','https://api.ies.ed.gov/eric/?'+urlencode({'search':'(reading comprehension) AND fulltext:"T"','format':'json','rows':3,'start':0})),
-        ('NASA searchTerm','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'searchTerm':'Apollo 11','page.size':3})),
+        ('ERIC expanded','https://api.ies.ed.gov/eric/?'+urlencode({'search':'reading comprehension','format':'json','rows':40,'start':0})),
+        ('NASA q + downloads filter','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','downloadsAvailable':'true','page.size':40,'page.from':0})),
         ('NASA q','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','page.size':3})),
         ('Europe PMC','https://www.ebi.ac.uk/europepmc/webservices/rest/search?'+urlencode({'query':'malaria vaccine AND OPEN_ACCESS:Y','format':'json','pageSize':3,'resultType':'core'})),
         ('Library of Congress','https://www.loc.gov/search/?'+urlencode({'fo':'json','q':'civil war maps','c':3,'fa':'access-restricted:false'})),
@@ -73,7 +73,7 @@ def inspect_metadata():
             for item in records[:3] if isinstance(records,list) else []:
                 if not isinstance(item,dict):continue
                 sample={'keys':list(item)[:60]}
-                for key in ('id','title','fulltext','pmcid','downloads','fullTextUrlList','resources','access_restricted','stiType','distribution'):
+                for key in ('id','title','fulltext','pmcid','downloads','downloadsAvailable','fullTextUrlList','resources','access_restricted','stiType','distribution'):
                     if key in item:sample[key]=str(item[key])[:700]
                 out['samples'].append(sample)
             if label.startswith('NASA') and records and isinstance(records,list) and isinstance(records[0],dict):

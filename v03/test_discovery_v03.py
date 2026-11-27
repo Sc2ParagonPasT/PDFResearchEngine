@@ -23,15 +23,27 @@ class Tests(unittest.TestCase):
     def test_ERIC_filters_nonfulltext(self):
         net=Network(base.DEFAULT_HOSTS)
         with patch.object(net,'json',return_value={'response':{'docs':[{'id':'ED123','title':'Good','fulltext':'T'},{'id':'EJ456','title':'Bad','fulltext':'F'}]}}) as get:
-            self.assertEqual([x.title for x in discover(net,'ERIC','school')],['Good']);self.assertIn('fulltext',get.call_args.args[0])
+            self.assertEqual([x.title for x in discover(net,'ERIC','school')],['Good']);self.assertEqual(base.urlsplit(get.call_args.args[0]).query, 'search=school&format=json&rows=40&start=0')
+    def test_repository_api_error_not_silently_empty(self):
+        net=Network(base.DEFAULT_HOSTS)
+        with patch.object(base.Network,'json',return_value={'error':'unsupported filter'}):
+            with self.assertRaisesRegex(ValueError,'Repository API error'): net.json('https://api.ies.ed.gov/eric/')
+    def test_metadata_timeout_retries_once(self):
+        net=Network(base.DEFAULT_HOSTS)
+        with patch.object(base.Network,'json',side_effect=[TimeoutError('timed out'),{'response':{'docs':[]}}]) as get, patch('discovery_v03.time.sleep'):
+            self.assertEqual(net.json('https://api.ies.ed.gov/eric/'),{'response':{'docs':[]}});self.assertEqual(get.call_count,2)
+        with patch.object(base.Network,'json',side_effect=TimeoutError('timed out')) as get, patch('discovery_v03.time.sleep'):
+            with self.assertRaises(TimeoutError): net.json('https://api.ies.ed.gov/eric/')
+            self.assertEqual(get.call_count,2)
     def test_pmc_no_guessed_links(self):
         net=Network(base.DEFAULT_HOSTS)
         with patch.object(net,'json',return_value={'resultList':{'result':[{'pmcid':'PMC123','title':'No PDF'},{'title':'Good','fullTextUrlList':{'fullTextUrl':[{'documentStyle':'pdf','availabilityCode':'OA','url':'https://europepmc.org/pdf'}]}}]}}):
             self.assertEqual([x.title for x in discover(net,'Europe PMC','health')],['Good'])
     def test_nasa_only_explicit_approved_pdf_links(self):
         net=Network(base.DEFAULT_HOSTS)
-        with patch.object(net,'json',return_value={'results':[{'title':'Report','downloads':[{'links':{'pdf':'/api/citations/1/downloads/a.pdf'}},{'links':{'pdf':'https://unapproved.example/a.pdf'}}]},{'title':'No PDF','id':2}]}):
+        with patch.object(net,'json',return_value={'results':[{'title':'Report','downloads':[{'links':{'pdf':'/api/citations/1/downloads/a.pdf'}},{'links':{'pdf':'https://unapproved.example/a.pdf'}}]},{'title':'No PDF','id':2}]}) as get:
             self.assertEqual([x.url for x in discover(net,'NASA NTRS','apollo')],['https://ntrs.nasa.gov/api/citations/1/downloads/a.pdf'])
+            self.assertIn('q=apollo&downloadsAvailable=true',get.call_args.args[0])
     def test_loc_only_explicit_approved_pdf_links(self):
         net=Network(base.DEFAULT_HOSTS)
         with patch.object(net,'json',return_value={'results':[{'title':'Report','resources':[{'pdf':'/a.pdf'},{'files':[[{'mimetype':'application/pdf','url':'https://unapproved.example/a.pdf'},{'mimetype':'text/html','url':'/b.pdf'}]]}]},{'title':'Private','access_restricted':True,'resources':[{'pdf':'/c.pdf'}]}]}):
