@@ -114,7 +114,7 @@ class ReaderWindow:
         ttk.Button(bar,text='Next',command=lambda:self.go(self.page+1)).pack(side='left')
         ttk.Button(bar,text='Zoom -',command=lambda:self.change_zoom(-.25)).pack(side='left',padx=4)
         ttk.Button(bar,text='Zoom +',command=lambda:self.change_zoom(.25)).pack(side='left')
-        ttk.Button(bar,text='Fit',command=lambda:self.set_zoom(1.0)).pack(side='left',padx=4)
+        ttk.Button(bar,text='Fit',command=self.fit).pack(side='left',padx=4)
         ttk.Button(bar,text='Full screen',command=self.fullscreen).pack(side='right')
         self.win.bind('<Escape>',lambda e:self.win.attributes('-fullscreen',False))
         search=ttk.Frame(f);search.pack(fill='x',pady=4)
@@ -134,9 +134,9 @@ class ReaderWindow:
         lower=ttk.Frame(pane);pane.add(lower,weight=1)
         ttk.Label(lower,text='Searchable page text (select and copy)').pack(anchor='w')
         self.text=app.text(lower,5);self.text.pack(fill='both',expand=True);self.text.configure(state='disabled')
-        self.photo=None
+        self.photo=None;self.intrinsic=None
     def open(self,digest,title,pages):
-        self.digest=digest;self.title=title;self.pages=max(1,int(pages));self.zoom=1.25
+        self.digest=digest;self.title=title;self.pages=max(1,int(pages));self.zoom=1.25;self.intrinsic=None
         last=self.app.prefs.get('reader_pages',{})
         try:page=max(1,min(self.pages,int(last.get(digest,1))))
         except (ValueError,TypeError,AttributeError):page=1
@@ -150,6 +150,10 @@ class ReaderWindow:
     def set_zoom(self,value):
         if self.app.busy:return
         self.zoom=max(.5,min(3,value));self.go(self.page)
+    def fit(self):
+        if self.intrinsic:
+            w,h=self.intrinsic;self.set_zoom(min(self.canvas.winfo_width()/w,self.canvas.winfo_height()/h))
+        else:self.set_zoom(1.0)
     def change_zoom(self,delta):self.set_zoom(self.zoom+delta)
     def find(self):
         if self.app.busy or not self.digest:return
@@ -186,6 +190,7 @@ class ReaderWindow:
             self.photo=tk.PhotoImage(master=self.win,data=base64.b64encode(image),format='png')
             self.canvas.delete('all');self.canvas.create_image(0,0,image=self.photo,anchor='nw');self.canvas.configure(scrollregion=(0,0,self.photo.width(),self.photo.height()))
             self.canvas.xview_moveto(0);self.canvas.yview_moveto(0)
+            self.intrinsic=(info['width']/info['scale'],info['height']/info['scale'])
             self.page=info['page'];self.pages=info['pages'];self.pagevar.set(str(self.page));self.total.set('/ '+str(self.pages))
             self.text.configure(state='normal');self.text.delete('1.0','end');self.text.insert('1.0',info['text']);self.text.configure(state='disabled')
             self.status.set(f'Page {self.page} of {self.pages} • rendered at {info["scale"]*100:.0f}% • fresh rescan passed')

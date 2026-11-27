@@ -10,6 +10,7 @@ from pathlib import Path
 from desktop_helpers import safe_pdf_name, export_folder, load_preferences, save_preferences
 from discovery_v03 import Network, VERIFIED, run_search
 from catalog_v04 import CATALOG, BY_KEY, Index, search_catalog
+from reader_v04 import ReaderWindow
 from security import Pipeline, Blocked
 
 BG='#11151b'; PANEL='#1b222c'; FG='#e5eaf2'; MUTED='#a3b0c2'
@@ -114,6 +115,7 @@ def desktop_class(Base):
             w=super().text(parent,height);w.configure(font=self.normalfont);return w
         def layout(self):
             super().layout()
+            self.reader=None
             self.catalog_index=Index(self.root/'discovery-v04.sqlite3')
             self.catalog_keys=set(self.prefs.get('catalog_enabled',[]))&set(BY_KEY)
             self.win.title('PDF Research Engine | v0.4 development')
@@ -138,10 +140,12 @@ def desktop_class(Base):
             ttk.Button(libbar,text='Open Library Folder',command=self.open_library).grid(row=0,column=0,sticky='w')
             ttk.Button(libbar,text='Open Export Folder',command=self.open_export).grid(row=0,column=1,sticky='w',padx=4)
             ttk.Button(libbar,text='Choose Export Folder',command=self.choose_export).grid(row=0,column=2,sticky='w',padx=4)
+            ttk.Button(libbar,text='Read Selected PDF',command=self.open_reader).grid(row=1,column=0,sticky='w',pady=3)
+            self.lt.bind('<Double-1>',lambda e:self.open_reader())
             self.autoexport=tk.BooleanVar(value=bool(self.prefs.get('auto_export',False)))
-            ttk.Checkbutton(libbar,text='Automatically export after final rescan',variable=self.autoexport,command=self.store_auto).grid(row=1,column=0,columnspan=3,sticky='w',pady=3)
+            ttk.Checkbutton(libbar,text='Automatically export after final rescan',variable=self.autoexport,command=self.store_auto).grid(row=2,column=0,columnspan=3,sticky='w',pady=3)
             self.pathlabel=tk.StringVar()
-            ttk.Label(libbar,textvariable=self.pathlabel,wraplength=1100).grid(row=2,column=0,columnspan=3,sticky='w')
+            ttk.Label(libbar,textvariable=self.pathlabel,wraplength=1100).grid(row=3,column=0,columnspan=3,sticky='w')
             self.update_paths()
             self.action_buttons=[]
             for w in walk(self.win):
@@ -153,6 +157,14 @@ def desktop_class(Base):
             self.textsize.set(max(10,min(24,round(float(v)))));self.apply_fonts()
         def update_paths(self):
             self.pathlabel.set('Internal library: '+str(self.root/'processed')+'\nPDF exports: '+str(export_folder(self.prefs.get('last_folder'))))
+        def open_reader(self):
+            if self.busy:messagebox.showinfo('Busy','Finish or stop the current operation first.');return
+            ids=self.lt.selection()
+            if not ids:messagebox.showinfo('Reader','Select one screened library document.');return
+            title,_,_,status,pages=self.lt.item(ids[0],'values')
+            if status!=ACTIVE:messagebox.showerror('Reader denied','This document is not an active screened library item.');return
+            if self.reader is None:self.reader=ReaderWindow(self)
+            self.reader.open(self.docids[ids[0]],title,pages)
         def open_library(self):
             try:
                 p=self.root/'processed';p.mkdir(exist_ok=True);reveal(p)
@@ -171,7 +183,7 @@ def desktop_class(Base):
             f=ttk.Frame(w,padding=18);f.pack(fill='both',expand=True)
             ttk.Label(f,text='Start researching',style='Title.TLabel').pack(anchor='w')
             body=self.text(f,12);body.pack(fill='both',expand=True,pady=10)
-            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Source Catalog contains built-in independent, historical, scientific and other collections. Enable them once, rather than typing website addresses. Unvalidated sources may not return results. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
+            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Double-click a screened document to open the reader, which verifies and rescans the document before rendering each page. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Source Catalog contains built-in independent, historical, scientific and other collections. Enable them once, rather than typing website addresses. Unvalidated sources may not return results. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
             body.configure(state='disabled')
             hide=tk.BooleanVar(value=bool(self.prefs.get('hide_welcome',False)))
             ttk.Checkbutton(f,text="Don't show this again",variable=hide).pack(anchor='w')
@@ -354,6 +366,8 @@ def desktop_class(Base):
                     k,v=self.events.get_nowait()
                     if k.startswith('batch_'):
                         if self.monitor:self.monitor.event(k,v)
+                    elif k.startswith('reader_'):
+                        if self.reader:self.reader.event(k,v)
                     elif k=='saved_folder':
                         self.prefs['last_folder']=v;self.persist();self.update_paths()
                     elif k=='result':
