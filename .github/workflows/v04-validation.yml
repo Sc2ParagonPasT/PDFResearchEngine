@@ -49,6 +49,7 @@ jobs:
                   root.update()
                   assert gui.searchbtn.cget('text')=='Search'
                   gui.resize_text(24);root.update()
+                  assert gui.content_parent.winfo_height()>0
                   assert gui.normalfont.cget('size')==24
                   gui.resize_text(13)
                   gui.welcome();root.update()
@@ -57,7 +58,7 @@ jobs:
                   gui.show_monitor();gui.monitor.begin(['Test document']*10)
                   gui.monitor.event('batch_row',(0,'Active','Checking staged PDF'))
                   gui.monitor.event('batch_row',(0,'Completed','Indexed'))
-                  gui.monitor.event('batch_end',None)
+                  gui.monitor.event('batch_end',True)
                   assert gui.monitor.states.count('Completed')==1
                   assert gui.monitor.states.count('Cancelled')==9
                   gui.persist();root.destroy()

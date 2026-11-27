@@ -22,6 +22,25 @@ def walk(widget):
         yield child
         yield from walk(child)
 
+def scroll_shell(parent):
+    outer=ttk.Frame(parent);outer.pack(fill='both',expand=True)
+    canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+    canvas.grid(row=0,column=0,sticky='nsew');outer.rowconfigure(0,weight=1);outer.columnconfigure(0,weight=1)
+    y=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview);y.grid(row=0,column=1,sticky='ns')
+    x=ttk.Scrollbar(outer,orient='horizontal',command=canvas.xview);x.grid(row=1,column=0,sticky='ew')
+    canvas.configure(xscrollcommand=x.set,yscrollcommand=y.set)
+    inner=ttk.Frame(canvas);window=canvas.create_window(0,0,window=inner,anchor='nw')
+    scheduled=[False]
+    def fit():
+        scheduled[0]=False
+        if not canvas.winfo_exists():return
+        width=max(canvas.winfo_width(),inner.winfo_reqwidth());height=max(canvas.winfo_height(),inner.winfo_reqheight())
+        canvas.itemconfigure(window,width=width,height=height);canvas.configure(scrollregion=(0,0,width,height))
+    def update(*_):
+        if not scheduled[0]:scheduled[0]=True;canvas.after_idle(fit)
+    inner.bind('<Configure>',update);canvas.bind('<Configure>',update)
+    return inner,update
+
 def reveal(folder):
     folder=Path(folder)
     if not folder.is_dir():raise ValueError('Folder is unavailable: '+str(folder))
@@ -75,7 +94,9 @@ class Monitor:
         elif kind=='batch_log':self.head.set(str(value)[:300]);self.append(value)
         elif kind=='batch_end':
             for i,s in enumerate(self.states):
-                if s=='Queued':self.states[i]='Cancelled';self.table.set(self.rows[i],'outcome','Cancelled')
+                if s in ('Queued','Active'):
+                    outcome='Cancelled' if value and s=='Queued' else 'Failed'
+                    self.states[i]=outcome;self.table.set(self.rows[i],'outcome',outcome)
             self.counts();self.cancel.configure(state='disabled');self.head.set('Batch finished. Review each document outcome.');self.append('Batch finished.')
     def append(self,msg):
         self.log.configure(state='normal');self.log.insert('end',dt.datetime.now().strftime('%H:%M:%S')+'  '+str(msg)[:500]+'\n');self.log.see('end');self.log.configure(state='disabled')
@@ -105,6 +126,7 @@ def desktop_class(Base):
                     w.configure(font=self.normalfont)
                 elif isinstance(w,ttk.Label) and str(w.cget('style'))=='Title.TLabel':
                     w.configure(font=self.titlefont)
+            if hasattr(self,'update_scroll'):self.update_scroll()
             self.prefs['text_size']=size
             if self.sizeset is not None:self.win.after_cancel(self.sizeset)
             self.sizeset=self.win.after(350,self.persist)
@@ -115,6 +137,7 @@ def desktop_class(Base):
         def text(self,parent,height=6):
             w=super().text(parent,height);w.configure(font=self.normalfont);return w
         def layout(self):
+            self.content_parent,self.update_scroll=scroll_shell(self.win)
             super().layout()
             self.reader=None
             self.catalog_file=self.root/'source-catalog-v04.json'
@@ -124,9 +147,9 @@ def desktop_class(Base):
                 except (OSError,ValueError,TypeError):pass
             self.catalog_index=Index(self.root/'discovery-v04.sqlite3')
             self.catalog_keys=set(self.prefs.get('catalog_enabled',[]))&set(BY_KEY)
-            self.win.title('PDF Research Engine | v0.4 development')
+            self.win.title('PDF Research Engine | v0.4 Experimental')
             self.win.geometry('1320x900')
-            shell=self.win.winfo_children()[0]
+            shell=self.content_parent.winfo_children()[0]
             header=ttk.Frame(shell);header.pack(fill='x',before=shell.winfo_children()[0],pady=(0,8))
             ttk.Label(header,text='Text size').pack(side='left')
             ttk.Scale(header,from_=10,to=24,variable=self.textsize,command=lambda v:self.resize_text(v)).pack(side='left',fill='x',expand=True,padx=8)
@@ -135,6 +158,8 @@ def desktop_class(Base):
             ttk.Button(header,text='Quick Start Guide',command=self.welcome).pack(side='right')
             ttk.Button(header,text='Processing Monitor',command=self.show_monitor).pack(side='right',padx=5)
             ttk.Button(header,text='Source Catalog',command=self.catalog_window).pack(side='right',padx=5)
+            helpbar=ttk.Frame(shell);helpbar.pack(fill='x',after=header)
+            ttk.Button(helpbar,text='About / Notices',command=self.about).pack(side='right')
             self.searchbtn.configure(text='Search')
             for w in walk(self.discovery):
                 if isinstance(w,ttk.Entry) and str(w.cget('textvariable'))==str(self.q):
@@ -183,6 +208,19 @@ def desktop_class(Base):
             if p:self.prefs['last_folder']=p;self.persist();self.update_paths()
         def store_auto(self):
             self.prefs['auto_export']=self.autoexport.get();self.persist()
+        def about(self):
+            import sys
+            w=tk.Toplevel(self.win);w.title('About PDF Research Engine');w.geometry('850x650');w.configure(bg=BG)
+            f=ttk.Frame(w,padding=12);f.pack(fill='both',expand=True)
+            ttk.Label(f,text='PDF Research Engine v0.4 • Experimental',style='Title.TLabel').pack(anchor='w')
+            body=self.text(f,15);body.pack(fill='both',expand=True,pady=8)
+            base=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))
+            p=base/'THIRD_PARTY_NOTICES.md'
+            text='Free, open-source research application. Unsigned experimental build. Security screening reduces risk but does not guarantee safety; the worker is not an OS sandbox.\n\nSource: https://github.com/Sc2ParagonPasT/PDFResearchEngine\n\n'
+            try:text+=p.read_text(encoding='utf-8')
+            except OSError:text+='Third-party notices are available in the source repository.'
+            body.insert('1.0',text);body.configure(state='disabled')
+            ttk.Button(f,text='Close',command=w.destroy).pack(anchor='e')
         def welcome(self):
             if getattr(self,'guide',None) and self.guide.winfo_exists():self.guide.lift();return
             w=self.guide=tk.Toplevel(self.win);w.title('Welcome to PDF Research Engine');w.geometry('780x650');w.configure(bg=BG)
@@ -207,7 +245,7 @@ def desktop_class(Base):
             self.show_monitor();self.monitor.begin(titles)
             def work():
                 try:fn()
-                finally:self.events.put(('batch_end',None))
+                finally:self.events.put(('batch_end',self.stop.is_set()))
             self.start(work)
         def start(self,fn):
             ok=super().start(fn)

@@ -13,6 +13,7 @@ def change(s,a,b):
     if s.count(a)!=1:raise RuntimeError('Expected one anchor: '+a[:100])
     return s.replace(a,b)
 p=root/'app.py';s=p.read_text(encoding='utf-8')
+s=change(s,'shell=ttk.Frame(self.win,padding=18)','shell=ttk.Frame(getattr(self,"content_parent",self.win),padding=18)')
 s=change(s,"root=tk.Tk()\n        try:\n            with single_instance(ROOT):App(root).win.mainloop()","root=tk.Tk()\n        from desktop_v04 import desktop_class\n        try:\n            with single_instance(ROOT):desktop_class(App)(root).win.mainloop()")
 s=change(s,"    else:\n        root=tk.Tk()","    elif len(sys.argv)==7 and sys.argv[1]=='--reader-page':\n        from reader_v04 import worker_main\n        sys.exit(worker_main(sys.argv[2:]))\n    else:\n        root=tk.Tk()")
 p.write_text(s,encoding='utf-8')
