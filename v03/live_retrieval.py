@@ -1,6 +1,7 @@
 """Live, bounded retrieval smoke test. Raw responses are never opened or parsed."""
 import concurrent.futures
 import json
+import platform
 import tempfile
 import threading
 from pathlib import Path
@@ -22,13 +23,16 @@ def check(provider, term):
         report['verified']=len(results)
         report['messages']=messages
         with tempfile.TemporaryDirectory(prefix='pdfresearch-live-') as td:
-            for item in results[:4]:
+            seen_hashes=set()
+            for item in results[:6]:
                 if len(report['downloaded'])>=2: break
                 try:
                     assert item.status==VERIFIED
                     file,digest,size,final=net.download(item.url,Path(td))
                     if not file.is_file() or file.suffix!='.quarantine' or size<=0:
                         raise RuntimeError('Download did not produce quarantine file')
+                    if digest in seen_hashes: continue
+                    seen_hashes.add(digest)
                     report['downloaded'].append({'title':item.title,'url':final,'bytes':size,'sha256':digest})
                 except Exception as e:
                     report['errors'].append({'url':item.url,'reason':str(e)[:300]})
@@ -95,10 +99,12 @@ if __name__=='__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         reports=list(pool.map(lambda p:check(p,TOPICS[p]),TOPICS))
     # Do not declare readiness until every default repository produces two full PDFs.
-    passed=all(len(r['downloaded'])>=2 for r in reports if r['provider'] in DEFAULT_PROVIDERS)
-    output={'passed':passed,'required_default_sources':list(DEFAULT_PROVIDERS),
+    by_provider={r['provider']:r for r in reports}
+    passed=all(p in by_provider and len(by_provider[p]['downloaded'])>=2 for p in DEFAULT_PROVIDERS)
+    output={'passed':passed,'platform':platform.platform(),'required_default_sources':list(DEFAULT_PROVIDERS),
+            'optional_sources':{r['provider']:('passed' if len(r['downloaded'])>=2 else 'not validated') for r in reports if r['provider'] not in DEFAULT_PROVIDERS},
             'reports':reports,'scope':'Discovery and transport only; no PDFs opened, parsed, or distributed. Raw fixtures removed from temporary storage.'}
-    if not passed:
+    if not passed or any(len(r['downloaded'])<2 for r in reports):
         output['metadata_diagnostics']=inspect_metadata()
     Path('live-retrieval-results.json').write_text(json.dumps(output,indent=2),encoding='utf-8')
     print(json.dumps(output,indent=2),flush=True)

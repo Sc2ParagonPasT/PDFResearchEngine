@@ -12,7 +12,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   retrieval:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +29,7 @@ jobs:
           set -euo pipefail
           zip='PDF_Research_Engine_v0.2_source (1).zip'
           if [[ -f PDF_Research_Engine_v0.2_source.zip ]]; then zip=PDF_Research_Engine_v0.2_source.zip; fi
-          echo "4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9  $zip" | sha256sum --check
-          unzip -q "$zip" -d source
+          python -c 'import hashlib,sys,zipfile; from pathlib import Path; p=Path(sys.argv[1]); assert hashlib.sha256(p.read_bytes()).hexdigest()=="4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9"; zipfile.ZipFile(p).extractall("source")' "$zip"
           python v03/prepare.py source/PDF_Research_Engine_v0.2
           python -m compileall -q source/PDF_Research_Engine_v0.2
       - name: Retrieval regression tests
@@ -39,7 +42,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v03-live-retrieval-report
+          name: v03-live-retrieval-report-${{ matrix.os }}
           path: source/PDF_Research_Engine_v0.2/live-retrieval-results.json
           if-no-files-found: warn
           retention-days: 14

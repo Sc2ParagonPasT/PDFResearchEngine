@@ -10,7 +10,9 @@ import engine as base
 from engine import Result, checked_url, HEADER, MAX_PDF
 
 PROVIDERS = ('ERIC', 'Europe PMC', 'NASA NTRS', 'Library of Congress', 'Crossref', 'arXiv')
-DEFAULT_PROVIDERS = ('ERIC', 'Europe PMC', 'NASA NTRS')
+# Default sources must be validated for complete public PDF downloads.
+# Europe PMC and LOC remain optional until their live reliability is established.
+DEFAULT_PROVIDERS = ('ERIC', 'NASA NTRS', 'arXiv')
 VERIFIED = 'PDF reachable / unscanned'
 MAX_CANDIDATES = 100
 MAX_RESULTS = 50

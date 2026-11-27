@@ -8,6 +8,9 @@ class Response(io.BytesIO):
     def getheader(self,key,default=None): return self.headers.get(key,default)
 
 class Tests(unittest.TestCase):
+    def test_defaults_are_live_validated_source_set(self):
+        self.assertEqual(set(DEFAULT_PROVIDERS), {'ERIC','NASA NTRS','arXiv'})
+        self.assertTrue({'Europe PMC','Library of Congress'}.issubset(PROVIDERS))
     def test_probe_full_get(self):
         net=Network(['www.cia.gov']);u='https://www.cia.gov/a.pdf'
         r=Response(b'%PDF-1.7\nhello');c=Mock()
