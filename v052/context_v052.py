@@ -116,7 +116,7 @@ def hits(concept,fields):
         for f in fields:
             for term in choices:
                 for a,b in positions(f.words,term):
-                    found.append(Hit(f,term,kind,a,b,base+f.weight+(3 if b-a>1 else 0)))
+                    found.append(Hit(f,term,kind,a,b,base+f.weight+(3 if b-a>1 and kind!='Direct' else 0)))
     return sorted(found,key=lambda h:(-h.value,-(h.end-h.start),h.term))
 def distance(a,b,c,d):return max(0,c-b,a-d)
 def linked(h,cues):
@@ -177,7 +177,12 @@ class Policy:
         if not relation:score-=12
         if alternate:score-=18
         if missing:score-=12*missing/n
-        if any(f.name=='title' and positions(f.words,self.query) for f in fields):score+=8
+        # For a standalone recognized concept, its reviewed direct aliases carry the
+        # same title bonus as the literal query. Do not reward alias length.
+        standalone=len(parsed.concepts)==1 and not parsed.profiles and normalized_term(self.query) in tuple(normalized_term(a) for a in parsed.concepts[0].direct)
+        exact=any(f.name=='title' and positions(f.words,self.query) for f in fields)
+        equivalent=standalone and any(h.kind=='Direct' and h.field.name=='title' for h in all_hits[0])
+        if exact or equivalent:score+=8
         score=max(1,min(100,round(score)))
         if mode=='Exploratory' and (absent or missing or alternate or any(h.kind=='Exploratory' for h in selected)):
             score=min(score,48)

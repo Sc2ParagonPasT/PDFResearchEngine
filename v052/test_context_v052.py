@@ -16,6 +16,16 @@ class ContextTests(unittest.TestCase):
                 self.assertIsNotNone(b,(q,related))
                 self.assertIsNone(c,(q,negative))
                 self.assertGreaterEqual(a.score,b.score,(q,a,b))
+    def test_reviewed_acronym_equivalence(self):
+        for short,long in (('FBI','Federal Bureau of Investigation'),('CIA','Central Intelligence Agency'),('FOIA','Freedom of Information Act')):
+            for query in (short,long):
+                for mode in ('Focused','Balanced','Exploratory'):
+                    with self.subTest(query=query,mode=mode):
+                        policy=Policy(query,mode)
+                        a=policy.evaluate(doc(short+' records'))
+                        b=policy.evaluate(doc(long+' records'))
+                        self.assertIsNotNone(a);self.assertIsNotNone(b)
+                        self.assertEqual(a.score,b.score)
     def test_benchmark_focused(self):
         for q,positive,_,negative in CASES:
             with self.subTest(query=q):
