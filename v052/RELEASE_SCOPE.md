@@ -1,0 +1,3 @@
+# v0.5.2 contextual relevance
+
+Reviewed compound concepts, related/exploratory associations, nearby contextual evidence, title and metadata weighting, context-specific alternate-domain penalties, and expansions retaining the original query context. No ideology filters, raw PDF parsing, paid services, or new repositories. Retain all prior security, settings, cache, UI and file-size limits. Synthetic benchmark: 28 distinct topics, three labelled examples each. Separate 20+ live metadata query attempts with counts and samples, not an independently labelled accuracy benchmark. Windows and Linux run the fixture regression suite and live PDF retrieval tests. v0.5.1 remains separate.
