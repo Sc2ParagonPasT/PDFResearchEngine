@@ -1,0 +1,65 @@
+name: v0.4 development validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'v04/**'
+      - '.github/workflows/v04-validation.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pdfresearch-v04-validation
+  cancel-in-progress: true
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare exact baseline and desktop overlay
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:v03)" = f7d0376ef421050ed1c494495b04e081cac417c7
+          python -c 'import hashlib,zipfile; from pathlib import Path; p=Path("PDF_Research_Engine_v0.2_source (1).zip"); assert hashlib.sha256(p.read_bytes()).hexdigest()=="4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9"; zipfile.ZipFile(p).extractall("source")'
+          python v04/prepare.py source/PDF_Research_Engine_v0.2
+          python -m compileall -q source/PDF_Research_Engine_v0.2
+      - name: Install test-only native dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb tesseract-ocr-eng
+          python -m pip install --only-binary=:all: pymupdf yara-python
+      - name: Security and desktop regression tests
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -m unittest -v test_engine test_security test_discovery_v03 test_desktop_v04
+      - name: Desktop smoke test in isolated display
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: |
+          xvfb-run -a python - <<'PY'
+          import tempfile, pathlib, tkinter as tk, unittest.mock as mock
+          import app
+          from desktop_v04 import desktop_class
+          with tempfile.TemporaryDirectory() as td:
+              app.ROOT=pathlib.Path(td)
+              with mock.patch.object(app.App,'check_security',lambda self:None):
+                  root=tk.Tk()
+                  gui=desktop_class(app.App)(root)
+                  root.update()
+                  assert gui.searchbtn.cget('text')=='Search'
+                  gui.resize_text(24);root.update()
+                  assert gui.normalfont.cget('size')==24
+                  gui.resize_text(13)
+                  gui.welcome();root.update()
+                  assert gui.guide.winfo_exists()
+                  gui.guide.destroy()
+                  gui.show_monitor();gui.monitor.begin(['Test document']*10)
+                  gui.monitor.event('batch_row',(0,'Active','Checking staged PDF'))
+                  gui.monitor.event('batch_row',(0,'Completed','Indexed'))
+                  gui.monitor.event('batch_end',None)
+                  assert gui.monitor.states.count('Completed')==1
+                  assert gui.monitor.states.count('Cancelled')==9
+                  gui.persist();root.destroy()
+          print('Desktop smoke test passed; not a clean Windows desktop test.')
+          PY
