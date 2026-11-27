@@ -7,7 +7,7 @@ here=Path(__file__).resolve().parent
 subprocess.run([sys.executable,str(here.parent/'v03'/'prepare.py'),str(root)],check=True)
 subprocess.run([sys.executable,str(here.parent/'tools'/'apply-clam-temp-fix.py'),str(root)],check=True)
 shutil.copyfile(here.parent/'patches'/'diagnostics.py',root/'diagnostics.py')
-for name in ('desktop_helpers.py','desktop_v04.py','test_desktop_v04.py'):
+for name in ('desktop_helpers.py','desktop_v04.py','test_desktop_v04.py','catalog_v04.py','test_catalog_v04.py','live_catalog.py'):
     shutil.copyfile(here/name,root/name)
 def change(s,a,b):
     if s.count(a)!=1:raise RuntimeError('Expected one anchor: '+a[:100])

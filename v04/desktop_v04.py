@@ -8,7 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, font
 from pathlib import Path
 from desktop_helpers import safe_pdf_name, export_folder, load_preferences, save_preferences
-from discovery_v03 import Network, VERIFIED
+from discovery_v03 import Network, VERIFIED, run_search
+from catalog_v04 import CATALOG, BY_KEY, Index, search_catalog
 from security import Pipeline, Blocked
 
 BG='#11151b'; PANEL='#1b222c'; FG='#e5eaf2'; MUTED='#a3b0c2'
@@ -113,6 +114,8 @@ def desktop_class(Base):
             w=super().text(parent,height);w.configure(font=self.normalfont);return w
         def layout(self):
             super().layout()
+            self.catalog_index=Index(self.root/'discovery-v04.sqlite3')
+            self.catalog_keys=set(self.prefs.get('catalog_enabled',[]))&set(BY_KEY)
             self.win.title('PDF Research Engine | v0.4 development')
             self.win.geometry('1320x900')
             shell=self.win.winfo_children()[0]
@@ -123,6 +126,7 @@ def desktop_class(Base):
             ttk.Button(header,text='Reset',command=lambda:self.resize_text(13)).pack(side='left',padx=5)
             ttk.Button(header,text='Quick Start Guide',command=self.welcome).pack(side='right')
             ttk.Button(header,text='Processing Monitor',command=self.show_monitor).pack(side='right',padx=5)
+            ttk.Button(header,text='Source Catalog',command=self.catalog_window).pack(side='right',padx=5)
             self.searchbtn.configure(text='Search')
             for w in walk(self.discovery):
                 if isinstance(w,ttk.Entry) and str(w.cget('textvariable'))==str(self.q):
@@ -167,13 +171,15 @@ def desktop_class(Base):
             f=ttk.Frame(w,padding=18);f.pack(fill='both',expand=True)
             ttk.Label(f,text='Start researching',style='Title.TLabel').pack(anchor='w')
             body=self.text(f,12);body.pack(fill='both',expand=True,pady=10)
-            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
+            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Source Catalog contains built-in independent, historical, scientific and other collections. Enable them once, rather than typing website addresses. Unvalidated sources may not return results. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
             body.configure(state='disabled')
             hide=tk.BooleanVar(value=bool(self.prefs.get('hide_welcome',False)))
             ttk.Checkbutton(f,text="Don't show this again",variable=hide).pack(anchor='w')
             def done():
                 self.prefs['hide_welcome']=hide.get();self.persist();w.destroy()
-            ttk.Button(f,text='Start Researching',command=done).pack(anchor='e',pady=8)
+            buttons=ttk.Frame(f);buttons.pack(fill='x',pady=8)
+            ttk.Button(buttons,text='Explore built-in sources',command=self.catalog_window).pack(side='left')
+            ttk.Button(buttons,text='Start Researching',command=done).pack(side='right')
             w.protocol('WM_DELETE_WINDOW',done);w.bind('<Escape>',lambda e:done())
         def show_monitor(self):
             if self.monitor is None:self.monitor=Monitor(self)
@@ -191,10 +197,75 @@ def desktop_class(Base):
                 self.searchbtn.configure(text='Working…')
                 for w in self.action_buttons:w.configure(state='disabled')
             return ok
+        def catalog_window(self):
+            if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalogwin.lift();return
+            w=self.catalogwin=tk.Toplevel(self.win);w.title('Built-in Source Catalog');w.geometry('1050x680');w.configure(bg=BG)
+            f=ttk.Frame(w,padding=12);f.pack(fill='both',expand=True)
+            ttk.Label(f,text=f'{len(CATALOG)} collection candidates • operational status varies',style='Title.TLabel',wraplength=980).pack(anchor='w')
+            ttk.Label(f,text='Choose collections once. Search automatically prioritizes up to eight relevant enabled collections per query in addition to the established search adapters. A reachable PDF is not yet security-screened.',wraplength=980).pack(fill='x',pady=6)
+            query=tk.StringVar();ttk.Entry(f,textvariable=query).pack(fill='x')
+            frame=ttk.Frame(f);frame.pack(fill='both',expand=True,pady=6)
+            tree=ttk.Treeview(frame,columns=('name','category','enabled','status'),show='headings',selectmode='extended')
+            for key,title,width in [('name','Collection',340),('category','Subject area',230),('enabled','Enabled',90),('status','Last local test',300)]:
+                tree.heading(key,text=title);tree.column(key,width=width,minwidth=70)
+            tree.pack(side='left',fill='both',expand=True)
+            sb=ttk.Scrollbar(frame,command=tree.yview);sb.pack(side='right',fill='y');tree.configure(yscrollcommand=sb.set)
+            def refresh(*_):
+                tree.delete(*tree.get_children());states=self.catalog_index.states()
+                for source in CATALOG:
+                    if query.get().lower() not in (source.name+' '+source.category+' '+source.tags).lower():continue
+                    state=states.get(source.key)
+                    status=state[3] if state else 'Not validated'
+                    tree.insert('','end',iid=source.key,values=(source.name,source.category,'Yes' if source.key in self.catalog_keys else 'No',status))
+            query.trace_add('write',refresh);refresh()
+            def enable(keys):
+                if self.busy:messagebox.showinfo('Busy','Wait until the current operation finishes.',parent=w);return
+                keys=set(keys)&set(BY_KEY)
+                hosts=sorted({host for key in keys for host in BY_KEY[key].hosts}-set(self.hosts))
+                if hosts:
+                    approval=tk.Toplevel(w);approval.title('Authorize exact HTTPS domains');approval.geometry('760x550');approval.transient(w);approval.grab_set()
+                    panel=ttk.Frame(approval,padding=12);panel.pack(fill='both',expand=True)
+                    ttk.Label(panel,text='These exact domains will be authorized for research requests. This is not a statement about their reliability or safety. All PDFs must still pass security inspection.',wraplength=700).pack(fill='x')
+                    body=self.text(panel,12);body.pack(fill='both',expand=True,pady=8);body.insert('1.0','\n'.join(hosts));body.configure(state='disabled')
+                    accepted=tk.BooleanVar(value=False)
+                    def yes():accepted.set(True);approval.destroy()
+                    ttk.Button(panel,text='Authorize listed domains',command=yes).pack(side='right')
+                    ttk.Button(panel,text='Cancel',command=approval.destroy).pack(side='right',padx=6)
+                    w.wait_window(approval)
+                    if not accepted.get():return
+                    try:
+                        cfg=load_preferences(self.config);cfg.update({'hosts':sorted(set(self.hosts)|set(hosts)),'seeds':self.seeds,'threat_action':self.threat_action,'auto_rescan':self.auto_rescan})
+                        save_preferences(self.config,cfg);self.hosts=cfg['hosts']
+                        self.hosttext.delete('1.0','end');self.hosttext.insert('1.0','\n'.join(self.hosts))
+                    except Exception as e:messagebox.showerror('Source approval',str(e),parent=w);return
+                self.catalog_keys.update(keys);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist();refresh()
+            def disable():
+                if self.busy:messagebox.showinfo('Busy','Wait until the current operation finishes.',parent=w);return
+                self.catalog_keys.difference_update(tree.selection());self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist();refresh()
+            buttons=ttk.Frame(f);buttons.pack(fill='x',pady=5)
+            ttk.Button(buttons,text='Enable all built-in collections',command=lambda:enable(BY_KEY)).pack(side='left')
+            ttk.Button(buttons,text='Enable selected',command=lambda:enable(tree.selection())).pack(side='left',padx=5)
+            ttk.Button(buttons,text='Disable selected',command=disable).pack(side='left')
+            ttk.Button(buttons,text='Refresh status',command=refresh).pack(side='right')
         def search(self):
             if self.busy:messagebox.showinfo('Busy','Wait for the current operation or click Stop.');return
-            super().search()
-            if self.busy:self.searchbtn.configure(text='Searching…');self.searchprogress.set('Searching and verifying PDF candidates…')
+            if self.generated_query!=self.q.get() or self.generated_depth!=self.depth.get():self.generate()
+            terms=list(dict.fromkeys(x.strip()[:240] for x in self.termtext.get('1.0','end').splitlines() if x.strip()))[:24]
+            providers=[p for p,v in self.providers.items() if v.get()];seeds=self.seeds if self.crawlvar.get() else []
+            keys=set(self.catalog_keys)
+            if not terms or not (providers or seeds or keys):messagebox.showinfo('Search','Enter a topic and enable a source.');return
+            self.tree.delete(*self.tree.get_children());self.results.clear();net=Network(self.hosts)
+            def work():
+                seen=set()
+                def emit(k,v):
+                    if k=='result':
+                        if v.url in seen:return
+                        seen.add(v.url)
+                    if k!='done':self.events.put((k,v))
+                if providers or seeds:run_search(net,providers,terms,seeds,self.stop,emit)
+                if keys and not self.stop.is_set():search_catalog(net,keys,terms,self.catalog_index,self.stop,emit,set(seen))
+                self.events.put(('done',f'{len(seen)} reachable PDFs; mandatory security inspection still required'+(' (stopped)' if self.stop.is_set() else '')))
+            if self.start(work):self.searchbtn.configure(text='Searching…');self.searchprogress.set('Searching and verifying PDF candidates…')
         def selected_action(self,action):
             if self.busy:messagebox.showinfo('Busy','Stop or finish the current search first.');return
             ids=self.tree.selection()
