@@ -16,7 +16,7 @@ $raw = [Guid]::NewGuid().ToString('N') + 'aA1!'
 $secret = ConvertTo-SecureString $raw -AsPlainText -Force
 $raw = $null
 try {
-    $account = New-LocalUser -Name $user -Password $secret -Description 'Disposable standard user for PDF Research Engine CI' -AccountNeverExpires
+    $account = New-LocalUser -Name $user -Password $secret -Description 'PDF Research CI standard user' -AccountNeverExpires
     $created = $true
     $sid = $account.SID.Value
     $users = Get-LocalGroup -SID 'S-1-5-32-545'
