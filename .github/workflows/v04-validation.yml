@@ -33,7 +33,7 @@ jobs:
           python -m pip install --only-binary=:all: pymupdf yara-python
       - name: Security and desktop regression tests
         working-directory: source/PDF_Research_Engine_v0.2
-        run: python -m unittest -v test_engine test_security test_discovery_v03 test_desktop_v04 test_catalog_v04 test_reader_v04
+        run: python -m unittest -v test_engine test_security test_discovery_v03 test_desktop_v04
       - name: Desktop smoke test in isolated display
         working-directory: source/PDF_Research_Engine_v0.2
         run: |
@@ -48,6 +48,11 @@ jobs:
                   gui=desktop_class(app.App)(root)
                   root.update()
                   assert gui.searchbtn.cget('text')=='Search'
+                  assert not hasattr(gui,'catalog_window') and not hasattr(gui,'open_reader')
+                  assert not pathlib.Path('reader_v04.py').exists() and not pathlib.Path('catalog_v04.py').exists()
+                  entries=[x for x in __import__('desktop_v04').walk(gui.discovery) if isinstance(x,tk.ttk.Entry) and str(x.cget('textvariable'))==str(gui.q)]
+                  assert len(entries)==1 and entries[0].bind('<Return>')
+                  assert set(app.DEFAULT_PROVIDERS)=={p for p,v in gui.providers.items() if v.get()}
                   gui.resize_text(24);root.update()
                   assert gui.content_parent.winfo_height()>0
                   assert gui.normalfont.cget('size')==24
@@ -64,13 +69,3 @@ jobs:
                   gui.persist();root.destroy()
           print('Desktop smoke test passed; not a clean Windows desktop test.')
           PY
-      - name: Live independent collection validation
-        working-directory: source/PDF_Research_Engine_v0.2
-        run: python -u live_catalog.py
-      - name: Preserve catalog report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: v04-catalog-report
-          path: source/PDF_Research_Engine_v0.2/live-catalog-results.json
-          if-no-files-found: warn

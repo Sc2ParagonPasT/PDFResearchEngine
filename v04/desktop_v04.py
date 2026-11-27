@@ -8,10 +8,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, font
 from pathlib import Path
 from desktop_helpers import safe_pdf_name, export_folder, load_preferences, save_preferences
-from discovery_v03 import Network, VERIFIED, run_search
-from catalog_v04 import CATALOG, BY_KEY, Index, search_catalog
-import catalog_v04 as catalog
-from reader_v04 import ReaderWindow
+from discovery_v03 import Network
 from security import Pipeline, Blocked
 
 BG='#11151b'; PANEL='#1b222c'; FG='#e5eaf2'; MUTED='#a3b0c2'
@@ -139,14 +136,6 @@ def desktop_class(Base):
         def layout(self):
             self.content_parent,self.update_scroll=scroll_shell(self.win)
             super().layout()
-            self.reader=None
-            self.catalog_file=self.root/'source-catalog-v04.json'
-            self.catalog_backup=self.root/'source-catalog-v04.previous.json'
-            if self.catalog_file.is_file():
-                try:catalog.apply_manifest(load_preferences(self.catalog_file))
-                except (OSError,ValueError,TypeError):pass
-            self.catalog_index=Index(self.root/'discovery-v04.sqlite3')
-            self.catalog_keys=set(self.prefs.get('catalog_enabled',[]))&set(BY_KEY)
             self.win.title('PDF Research Engine | v0.4 Experimental')
             self.win.geometry('1320x900')
             shell=self.content_parent.winfo_children()[0]
@@ -157,7 +146,6 @@ def desktop_class(Base):
             ttk.Button(header,text='Reset',command=lambda:self.resize_text(13)).pack(side='left',padx=5)
             ttk.Button(header,text='Quick Start Guide',command=self.welcome).pack(side='right')
             ttk.Button(header,text='Processing Monitor',command=self.show_monitor).pack(side='right',padx=5)
-            ttk.Button(header,text='Source Catalog',command=self.catalog_window).pack(side='right',padx=5)
             helpbar=ttk.Frame(shell);helpbar.pack(fill='x',after=header)
             ttk.Button(helpbar,text='About / Notices',command=self.about).pack(side='right')
             self.searchbtn.configure(text='Search')
@@ -171,8 +159,6 @@ def desktop_class(Base):
             ttk.Button(libbar,text='Open Library Folder',command=self.open_library).grid(row=0,column=0,sticky='w')
             ttk.Button(libbar,text='Open Export Folder',command=self.open_export).grid(row=0,column=1,sticky='w',padx=4)
             ttk.Button(libbar,text='Choose Export Folder',command=self.choose_export).grid(row=0,column=2,sticky='w',padx=4)
-            ttk.Button(libbar,text='Read Selected PDF',command=self.open_reader).grid(row=1,column=0,sticky='w',pady=3)
-            self.lt.bind('<Double-1>',lambda e:self.open_reader())
             self.autoexport=tk.BooleanVar(value=bool(self.prefs.get('auto_export',False)))
             ttk.Checkbutton(libbar,text='Automatically export after final rescan',variable=self.autoexport,command=self.store_auto).grid(row=2,column=0,columnspan=3,sticky='w',pady=3)
             self.pathlabel=tk.StringVar()
@@ -188,14 +174,6 @@ def desktop_class(Base):
             self.textsize.set(max(10,min(24,round(float(v)))));self.apply_fonts()
         def update_paths(self):
             self.pathlabel.set('Internal library: '+str(self.root/'processed')+'\nPDF exports: '+str(export_folder(self.prefs.get('last_folder'))))
-        def open_reader(self):
-            if self.busy:messagebox.showinfo('Busy','Finish or stop the current operation first.');return
-            ids=self.lt.selection()
-            if not ids:messagebox.showinfo('Reader','Select one screened library document.');return
-            title,_,_,status,pages=self.lt.item(ids[0],'values')
-            if status!=ACTIVE:messagebox.showerror('Reader denied','This document is not an active screened library item.');return
-            if self.reader is None:self.reader=ReaderWindow(self)
-            self.reader.open(self.docids[ids[0]],title,pages)
         def open_library(self):
             try:
                 p=self.root/'processed';p.mkdir(exist_ok=True);reveal(p)
@@ -227,14 +205,13 @@ def desktop_class(Base):
             f=ttk.Frame(w,padding=18);f.pack(fill='both',expand=True)
             ttk.Label(f,text='Start researching',style='Title.TLabel').pack(anchor='w')
             body=self.text(f,12);body.pack(fill='both',expand=True,pady=10)
-            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Double-click a screened document to open the reader, which verifies and rescans the document before rendering each page. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Source Catalog contains built-in independent, historical, scientific and other collections. Enable them once, rather than typing website addresses. Unvalidated sources may not return results. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
+            body.insert('1.0','SEARCH\nType a topic and press Enter or click Search. The app checks candidate PDF links before showing them.\n\nINSPECT\nSelect one or more results and choose Inspect & index selected. Watch the Processing Monitor for download, scanning and OCR progress. Blocked files are not released.\n\nLIBRARY\nOpen Local library to find searchable text and processed documents. Open Library Folder shows internal .screened files.\n\nSAVE\nUse Rescan & export PDF to save a normal PDF using the publication title. Choose an export folder and optionally enable automatic export.\n\nCUSTOMIZE\nUse the header text-size slider. Security screening reduces risk but cannot guarantee that documents are harmless. This experimental application is not an OS sandbox.')
             body.configure(state='disabled')
             hide=tk.BooleanVar(value=bool(self.prefs.get('hide_welcome',False)))
             ttk.Checkbutton(f,text="Don't show this again",variable=hide).pack(anchor='w')
             def done():
                 self.prefs['hide_welcome']=hide.get();self.persist();w.destroy()
             buttons=ttk.Frame(f);buttons.pack(fill='x',pady=8)
-            ttk.Button(buttons,text='Explore built-in sources',command=self.catalog_window).pack(side='left')
             ttk.Button(buttons,text='Start Researching',command=done).pack(side='right')
             w.protocol('WM_DELETE_WINDOW',done);w.bind('<Escape>',lambda e:done())
         def show_monitor(self):
@@ -253,117 +230,17 @@ def desktop_class(Base):
                 self.searchbtn.configure(text='Working…')
                 for w in self.action_buttons:w.configure(state='disabled')
             return ok
-        def catalog_window(self):
-            if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalogwin.lift();return
-            w=self.catalogwin=tk.Toplevel(self.win);w.title('Built-in Source Catalog');w.geometry('1050x680');w.configure(bg=BG)
-            f=ttk.Frame(w,padding=12);f.pack(fill='both',expand=True)
-            heading=tk.StringVar()
-            ttk.Label(f,textvariable=heading,style='Title.TLabel',wraplength=980).pack(anchor='w')
-            ttk.Label(f,text='Choose collections once. Search automatically prioritizes up to eight relevant enabled collections per query in addition to the established search adapters. A reachable PDF is not yet security-screened.',wraplength=980).pack(fill='x',pady=6)
-            query=tk.StringVar();ttk.Entry(f,textvariable=query).pack(fill='x')
-            frame=ttk.Frame(f);frame.pack(fill='both',expand=True,pady=6)
-            tree=ttk.Treeview(frame,columns=('name','category','enabled','status'),show='headings',selectmode='extended')
-            for key,title,width in [('name','Collection',340),('category','Subject area',230),('enabled','Enabled',90),('status','Last local test',300)]:
-                tree.heading(key,text=title);tree.column(key,width=width,minwidth=70)
-            tree.pack(side='left',fill='both',expand=True)
-            sb=ttk.Scrollbar(frame,command=tree.yview);sb.pack(side='right',fill='y');tree.configure(yscrollcommand=sb.set)
-            def refresh(*_):
-                heading.set(f'Catalog v{catalog.ACTIVE_VERSION} • {len(CATALOG)} collection candidates')
-                tree.delete(*tree.get_children());states=self.catalog_index.states()
-                for source in CATALOG:
-                    if query.get().lower() not in (source.name+' '+source.category+' '+source.tags).lower():continue
-                    state=states.get(source.key)
-                    status=state[3] if state else 'Not validated'
-                    tree.insert('','end',iid=source.key,values=(source.name,source.category,'Yes' if source.key in self.catalog_keys else 'No',status))
-            query.trace_add('write',refresh);refresh();self.catalog_refresh=refresh
-            def enable(keys):
-                if self.busy:messagebox.showinfo('Busy','Wait until the current operation finishes.',parent=w);return
-                keys=set(keys)&set(BY_KEY)
-                hosts=sorted({host for key in keys for host in BY_KEY[key].hosts}-set(self.hosts))
-                if hosts:
-                    approval=tk.Toplevel(w);approval.title('Authorize exact HTTPS domains');approval.geometry('760x550');approval.transient(w);approval.grab_set()
-                    panel=ttk.Frame(approval,padding=12);panel.pack(fill='both',expand=True)
-                    ttk.Label(panel,text='These exact domains will be authorized for research requests. This is not a statement about their reliability or safety. All PDFs must still pass security inspection.',wraplength=700).pack(fill='x')
-                    body=self.text(panel,12);body.pack(fill='both',expand=True,pady=8);body.insert('1.0','\n'.join(hosts));body.configure(state='disabled')
-                    accepted=tk.BooleanVar(value=False)
-                    def yes():accepted.set(True);approval.destroy()
-                    ttk.Button(panel,text='Authorize listed domains',command=yes).pack(side='right')
-                    ttk.Button(panel,text='Cancel',command=approval.destroy).pack(side='right',padx=6)
-                    w.wait_window(approval)
-                    if not accepted.get():return
-                    try:
-                        cfg=load_preferences(self.config);cfg.update({'hosts':sorted(set(self.hosts)|set(hosts)),'seeds':self.seeds,'threat_action':self.threat_action,'auto_rescan':self.auto_rescan})
-                        save_preferences(self.config,cfg);self.hosts=cfg['hosts']
-                        self.hosttext.delete('1.0','end');self.hosttext.insert('1.0','\n'.join(self.hosts))
-                    except Exception as e:messagebox.showerror('Source approval',str(e),parent=w);return
-                self.catalog_keys.update(keys);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist();refresh()
-            def disable():
-                if self.busy:messagebox.showinfo('Busy','Wait until the current operation finishes.',parent=w);return
-                self.catalog_keys.difference_update(tree.selection());self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist();refresh()
-            buttons=ttk.Frame(f);buttons.pack(fill='x',pady=5)
-            ttk.Button(buttons,text='Enable all built-in collections',command=lambda:enable(BY_KEY)).pack(side='left')
-            ttk.Button(buttons,text='Enable selected',command=lambda:enable(tree.selection())).pack(side='left',padx=5)
-            ttk.Button(buttons,text='Disable selected',command=disable).pack(side='left')
-            ttk.Button(buttons,text='Refresh status',command=refresh).pack(side='right')
-            updates=ttk.Frame(f);updates.pack(fill='x',pady=3)
-            ttk.Button(updates,text='Update Sources',command=self.update_catalog).pack(side='left')
-            ttk.Button(updates,text='Restore Previous Catalog',command=self.restore_catalog).pack(side='left',padx=5)
-            ttk.Label(updates,text='Data-only updates from the project GitHub repository').pack(side='left',padx=5)
-        def update_catalog(self):
-            if self.busy:messagebox.showinfo('Busy','Finish the current operation first.');return
-            def work():
-                try:self.events.put(('catalog_update',catalog.fetch_manifest()))
-                except Exception as e:self.events.put(('catalog_error',str(e)))
-            self.start(work)
-        def apply_catalog_update(self,data):
-            version,sources=catalog.parse_manifest(data)
-            if version<=catalog.ACTIVE_VERSION:
-                messagebox.showinfo('Source Catalog','The current catalog is up to date.');return
-            if not messagebox.askyesno('Source Catalog',f'Install catalog version {version} with {len(sources)} collections? New domain permissions will not be added automatically.'):return
-            try:
-                previous=load_preferences(self.catalog_file) if self.catalog_file.is_file() else catalog.bundled_manifest()
-                catalog.parse_manifest(previous)
-                save_preferences(self.catalog_backup,previous)
-                save_preferences(self.catalog_file,data)
-                catalog.apply_manifest(data)
-                self.catalog_keys.intersection_update(BY_KEY);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist()
-                if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalog_refresh()
-            except Exception as e:messagebox.showerror('Source Catalog',str(e))
-        def restore_catalog(self):
-            if self.busy:return
-            if not self.catalog_backup.is_file():messagebox.showinfo('Source Catalog','No previous catalog is stored.');return
-            if not messagebox.askyesno('Source Catalog','Restore the previous catalog? Existing domain permissions remain unchanged.'):return
-            try:
-                previous=load_preferences(self.catalog_backup);catalog.parse_manifest(previous)
-                save_preferences(self.catalog_file,previous);catalog.apply_manifest(previous,allow_rollback=True)
-                self.catalog_keys.intersection_update(BY_KEY);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist()
-                if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalog_refresh()
-            except Exception as e:messagebox.showerror('Source Catalog',str(e))
         def search(self):
             if self.busy:messagebox.showinfo('Busy','Wait for the current operation or click Stop.');return
-            if self.generated_query!=self.q.get() or self.generated_depth!=self.depth.get():self.generate()
-            terms=list(dict.fromkeys(x.strip()[:240] for x in self.termtext.get('1.0','end').splitlines() if x.strip()))[:24]
-            providers=[p for p,v in self.providers.items() if v.get()];seeds=self.seeds if self.crawlvar.get() else []
-            keys=set(self.catalog_keys)
-            if not terms or not (providers or seeds or keys):messagebox.showinfo('Search','Enter a topic and enable a source.');return
-            self.tree.delete(*self.tree.get_children());self.results.clear();net=Network(self.hosts)
-            def work():
-                seen=set()
-                def emit(k,v):
-                    if k=='result':
-                        if v.url in seen:return
-                        seen.add(v.url)
-                    if k!='done':self.events.put((k,v))
-                if providers or seeds:run_search(net,providers,terms,seeds,self.stop,emit)
-                if keys and not self.stop.is_set():search_catalog(net,keys,terms,self.catalog_index,self.stop,emit,set(seen))
-                self.events.put(('done',f'{len(seen)} reachable PDFs; mandatory security inspection still required'+(' (stopped)' if self.stop.is_set() else '')))
-            if self.start(work):self.searchbtn.configure(text='Searching…');self.searchprogress.set('Searching and verifying PDF candidates…')
+            super().search()
+            if self.busy:self.searchbtn.configure(text='Searching…');self.searchprogress.set('Searching and verifying PDF candidates…')
         def selected_action(self,action):
             if self.busy:messagebox.showinfo('Busy','Stop or finish the current search first.');return
             ids=self.tree.selection()
             if not ids:messagebox.showinfo('Select documents','Select one or more results first.');return
             if action!='download':return super().selected_action(action)
             if len(ids)>30:messagebox.showinfo('Batch limit','Select up to 30 documents.');return
+            if not messagebox.askyesno('Secure inspection',f'Inspect {len(ids)} selected document(s)? Each original and reconstructed copy must pass mandatory security checks. Only passing searchable derivatives are indexed. The worker is not an OS sandbox.'):return
             selected=[(i,dataclasses.replace(self.results[i])) for i in ids]
             auto=self.autoexport.get();folder=export_folder(self.prefs.get('last_folder'));net=Network(self.hosts)
             emit=lambda k,v:self.events.put((k,v))
@@ -446,10 +323,6 @@ def desktop_class(Base):
                     k,v=self.events.get_nowait()
                     if k.startswith('batch_'):
                         if self.monitor:self.monitor.event(k,v)
-                    elif k=='catalog_update':self.apply_catalog_update(v)
-                    elif k=='catalog_error':messagebox.showerror('Catalog update failed',str(v))
-                    elif k.startswith('reader_'):
-                        if self.reader:self.reader.event(k,v)
                     elif k=='saved_folder':
                         self.prefs['last_folder']=v;self.persist();self.update_paths()
                     elif k=='result':
@@ -468,7 +341,7 @@ def desktop_class(Base):
                     elif k=='log':
                         self.logs.configure(state='normal');self.logs.insert('end','\n'+str(v)[:500]);self.logs.see('end');self.logs.configure(state='disabled');self.status.set(str(v)[:160])
             except queue.Empty:pass
-            self.win.after(100,self.poll)
+            finally:self.win.after(100,self.poll)
         def close(self):
             if not self.busy:self.persist()
             super().close()
