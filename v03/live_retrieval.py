@@ -36,6 +36,58 @@ def check(provider, term):
         report['errors'].append({'reason':str(e)[:300]})
     return report
 
+
+def inspect_metadata():
+    """Record bounded public API metadata, not document bytes, to diagnose discovery."""
+    from urllib.parse import urlencode
+    import discovery_v03 as discovery
+    queries = [
+        ('ERIC baseline','https://api.ies.ed.gov/eric/?'+urlencode({'search':'reading comprehension','format':'json','rows':3,'start':0})),
+        ('ERIC filtered','https://api.ies.ed.gov/eric/?'+urlencode({'search':'(reading comprehension) AND fulltext:"T"','format':'json','rows':3,'start':0})),
+        ('NASA searchTerm','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'searchTerm':'Apollo 11','page.size':3})),
+        ('NASA q','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','page.size':3})),
+        ('Europe PMC','https://www.ebi.ac.uk/europepmc/webservices/rest/search?'+urlencode({'query':'malaria vaccine AND OPEN_ACCESS:Y','format':'json','pageSize':3,'resultType':'core'})),
+        ('Library of Congress','https://www.loc.gov/search/?'+urlencode({'fo':'json','q':'civil war maps','c':3,'fa':'access-restricted:false'})),
+    ]
+    def examine(entry):
+        label,url=entry
+        net=Network(DEFAULT_HOSTS)
+        out={'label':label,'url':url}
+        try:
+            data=net.json(url)
+            if not isinstance(data,dict):
+                out['root_type']=type(data).__name__;return out
+            out['root_keys']=list(data)[:40]
+            response=data.get('response',{})
+            rl=data.get('resultList',{})
+            out['counts']={k:data[k] for k in ('hitCount','total','totalResults') if k in data and isinstance(data[k],(int,str))}
+            if isinstance(response,dict):
+                out['response_keys']=list(response)
+                out['numFound']=response.get('numFound')
+            if isinstance(rl,dict):out['resultList_keys']=list(rl)
+            for k in ('stats','pagination'):
+                if k in data:out[k]=str(data[k])[:500]
+            records=data.get('results') or (response.get('docs',[]) if isinstance(response,dict) else []) or (rl.get('result',[]) if isinstance(rl,dict) else [])
+            out['records']=len(records) if isinstance(records,list) else type(records).__name__
+            out['samples']=[]
+            for item in records[:3] if isinstance(records,list) else []:
+                if not isinstance(item,dict):continue
+                sample={'keys':list(item)[:60]}
+                for key in ('id','title','fulltext','pmcid','downloads','fullTextUrlList','resources','access_restricted','stiType','distribution'):
+                    if key in item:sample[key]=str(item[key])[:700]
+                out['samples'].append(sample)
+            if label.startswith('NASA') and records and isinstance(records,list) and isinstance(records[0],dict):
+                ident=records[0].get('id')
+                if isinstance(ident,int) or isinstance(ident,str) and ident.isdigit():
+                    try:
+                        detail=net.json('https://ntrs.nasa.gov/api/citations/'+str(ident))
+                        out['citation_detail']={'keys':list(detail)[:60],'downloads':str(detail.get('downloads'))[:1200]} if isinstance(detail,dict) else type(detail).__name__
+                    except Exception as e:out['citation_detail_error']=str(e)[:300]
+        except Exception as e:out['error']=type(e).__name__+': '+str(e)[:300]
+        return out
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        return list(pool.map(examine,queries))
+
 if __name__=='__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         reports=list(pool.map(lambda p:check(p,TOPICS[p]),TOPICS))
@@ -43,6 +95,8 @@ if __name__=='__main__':
     passed=all(len(r['downloaded'])>=2 for r in reports if r['provider'] in DEFAULT_PROVIDERS)
     output={'passed':passed,'required_default_sources':list(DEFAULT_PROVIDERS),
             'reports':reports,'scope':'Discovery and transport only; no PDFs opened, parsed, or distributed. Raw fixtures removed from temporary storage.'}
+    if not passed:
+        output['metadata_diagnostics']=inspect_metadata()
     Path('live-retrieval-results.json').write_text(json.dumps(output,indent=2),encoding='utf-8')
     print(json.dumps(output,indent=2),flush=True)
     raise SystemExit(0 if passed else 1)
