@@ -61,7 +61,7 @@ def oa_pdf_links(net, pmcid):
     url = 'https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?' + urlencode({'id':pmcid})
     data = net.bytes(url, 65536)
     # This small metadata response needs no DTD or entity declarations.
-    if re.search(rb'<!\\s*(?:DOCTYPE|ENTITY)', data, re.I):
+    if b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper() or bytes([0]) in data:
         raise ValueError('Unexpected XML declaration')
     links = []
     for node in ET.fromstring(data).iter('link'):
