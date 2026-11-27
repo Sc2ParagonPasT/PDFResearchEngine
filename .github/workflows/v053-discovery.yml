@@ -1,0 +1,49 @@
+name: v0.5.3 repository candidate validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'v053/**'
+      - '.github/workflows/v053-discovery.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pdfresearch-v053-candidates
+  cancel-in-progress: true
+jobs:
+  candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned v0.5.2 baseline
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:v03)" = f7d0376ef421050ed1c494495b04e081cac417c7
+          test "$(git rev-parse HEAD:v04)" = 02d161c05020bb83c3d60efe31c6cd716bb8f017
+          test "$(git rev-parse HEAD:v05)" = f243bf58aea873cd30b82ab5da1137982dd9180e
+          test "$(git rev-parse HEAD:v051)" = 96b50de54654b08801fa529ed941d77401143536
+          test "$(git rev-parse HEAD:v052)" = 0262269fc4f81036aabf49ef8b96369303c576fd
+          python -c 'import hashlib,zipfile; from pathlib import Path; p=Path("PDF_Research_Engine_v0.2_source (1).zip"); assert hashlib.sha256(p.read_bytes()).hexdigest()=="4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9"; zipfile.ZipFile(p).extractall("source")'
+          python v052/prepare.py source/PDF_Research_Engine_v0.2
+          cp v053/*.py source/PDF_Research_Engine_v0.2/
+          python -m compileall -q source/PDF_Research_Engine_v0.2
+      - name: Install test dependencies
+        run: python -m pip install --only-binary=:all: pymupdf yara-python
+      - name: Candidate adapter safety and contract tests
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -m unittest -v test_adapters_v053 test_relevance_v051 test_context_v052
+      - name: Live public repository candidate evidence
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -u live_candidates_v053.py
+      - name: Retain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v053-candidate-evidence
+          path: source/PDF_Research_Engine_v0.2/repository-candidates-v053.json
+          if-no-files-found: warn
+          retention-days: 14
