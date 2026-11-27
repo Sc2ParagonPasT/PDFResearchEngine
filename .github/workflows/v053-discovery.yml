@@ -32,7 +32,8 @@ jobs:
           cp v053/*.py source/PDF_Research_Engine_v0.2/
           python -m compileall -q source/PDF_Research_Engine_v0.2
       - name: Install test dependencies
-        run: python -m pip install --only-binary=:all: pymupdf yara-python
+        run: |
+          python -m pip install --only-binary=:all: pymupdf yara-python
       - name: Candidate adapter safety and contract tests
         working-directory: source/PDF_Research_Engine_v0.2
         run: python -m unittest -v test_adapters_v053 test_relevance_v051 test_context_v052
