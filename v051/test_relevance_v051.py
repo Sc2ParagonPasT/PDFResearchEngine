@@ -1,5 +1,6 @@
 import sqlite3,tempfile,threading,unittest
 from pathlib import Path
+from contextlib import closing
 from unittest.mock import patch
 from relevance_v051 import *
 from repositories_v05 import Document,MetadataIndex,BY_KEY,Network,Session,run_search,VERIFIED
@@ -43,12 +44,16 @@ class RelevanceTests(unittest.TestCase):
     def test_cache_migration(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/'old.db'
-            with sqlite3.connect(p) as c:
-                c.execute('CREATE TABLE documents(source TEXT,url TEXT,title TEXT,year TEXT,authors TEXT,keywords TEXT,query TEXT,checked INTEGER,PRIMARY KEY(source,url))')
-                c.execute("INSERT INTO documents VALUES('zenodo','https://zenodo.org/a.pdf','Hatred in Society','2020','','','society',1)")
+            with closing(sqlite3.connect(p)) as c:
+                with c:
+                    c.execute('CREATE TABLE documents(source TEXT,url TEXT,title TEXT,year TEXT,authors TEXT,keywords TEXT,query TEXT,checked INTEGER,PRIMARY KEY(source,url))')
+                    c.execute("INSERT INTO documents VALUES('zenodo','https://zenodo.org/a.pdf','Hatred in Society','2020','','','society',1)")
             i=MetadataIndex(p);self.assertEqual(len(i.matches(BY_KEY['zenodo'],'hatred')),1)
             i.remember(BY_KEY['zenodo'],doc('Group relations',url='https://zenodo.org/b.pdf',description='Social hostility in society'))
             self.assertEqual(i.matches(BY_KEY['zenodo'],'hostility')[0].description,'Social hostility in society')
+            # Explicit unlink also detects leaked production cache handles on Windows.
+            p.unlink()
+            self.assertFalse(p.exists())
     def test_filter_before_probe_and_rank(self):
         events=[];records=[doc('Fairy tales in society',url='https://zenodo.org/fairy.pdf'),doc('Dehumanization',url='https://zenodo.org/weak.pdf'),doc('Hatred in society',url='https://zenodo.org/strong.pdf')]
         with patch.object(Session,'discover',return_value=(records,'')),patch.object(Network,'probe',side_effect=lambda u:(u,'','')) as probe:
