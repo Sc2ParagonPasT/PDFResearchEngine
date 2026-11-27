@@ -1,0 +1,3 @@
+# v0.5 architecture release
+
+Preserve v0.4.1 and v0.3 source trees. Eight selectable built-in sources: six existing and two new (Zenodo, Government Attic). Explicit domain approval for new repositories, grouped selection, 50–2000 result ceiling, bounded round-robin candidate scheduling, persistent SQLite metadata cache with live re-probe, per-source error reporting. Retain 50 MB limit and mandatory security pipeline. New sources require two full distinct public PDF downloads on Linux and Windows. No reader, remote catalog updater or other integrations yet. The earlier catalog and research report remain future candidates, not active integrations. Subsequent versions add broad, intelligence, unconventional, esoteric and other sources incrementally.
