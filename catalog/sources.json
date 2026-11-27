@@ -1,0 +1,906 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "key": "blackvault",
+      "name": "The Black Vault",
+      "seed": "https://www.theblackvault.com/documentarchive/",
+      "category": "Independent / UFO",
+      "tags": "ufo uap foia intelligence military classified",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "documents.theblackvault.com",
+        "theblackvault.com"
+      ]
+    },
+    {
+      "key": "nicap",
+      "name": "National Investigations Committee on Aerial Phenomena",
+      "seed": "https://www.nicap.org/",
+      "category": "Independent / UFO",
+      "tags": "ufo uap sightings reports aerial",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "nicap.org"
+      ]
+    },
+    {
+      "key": "cufos",
+      "name": "Center for UFO Studies",
+      "seed": "https://www.cufos.org/",
+      "category": "Independent / UFO",
+      "tags": "ufo uap sightings reports",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "cufos.org"
+      ]
+    },
+    {
+      "key": "mufon",
+      "name": "Mutual UFO Network",
+      "seed": "https://mufon.com/",
+      "category": "Independent / UFO",
+      "tags": "ufo sightings uap cases",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ufodata",
+      "name": "UFO Data Acquisition Project",
+      "seed": "https://www.ufodata.net/",
+      "category": "Independent / UFO",
+      "tags": "ufo instruments detection uap",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "uapx",
+      "name": "UAPx",
+      "seed": "https://www.uapexpedition.org/",
+      "category": "Independent / UFO",
+      "tags": "uap ufo scientific instrumentation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "nuforc",
+      "name": "National UFO Reporting Center",
+      "seed": "https://nuforc.org/",
+      "category": "Independent / UFO",
+      "tags": "ufo sightings reports",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "spr",
+      "name": "Society for Psychical Research",
+      "seed": "https://www.spr.ac.uk/",
+      "category": "Consciousness / psi",
+      "tags": "parapsychology psychic consciousness telepathy",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "spr.ac.uk"
+      ]
+    },
+    {
+      "key": "psi",
+      "name": "Psi Encyclopedia",
+      "seed": "https://psi-encyclopedia.spr.ac.uk/",
+      "category": "Consciousness / psi",
+      "tags": "psi mediumship telepathy reincarnation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "rhine",
+      "name": "Rhine Research Center",
+      "seed": "https://www.rhine.org/",
+      "category": "Consciousness / psi",
+      "tags": "parapsychology psychic precognition",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "rhine.org"
+      ]
+    },
+    {
+      "key": "pa",
+      "name": "Parapsychological Association",
+      "seed": "https://www.parapsych.org/",
+      "category": "Consciousness / psi",
+      "tags": "parapsychology psi telepathy experiments",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "sse",
+      "name": "Society for Scientific Exploration",
+      "seed": "https://www.scientificexploration.org/",
+      "category": "Unconventional science",
+      "tags": "anomalies consciousness physics archaeology",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "scientificexploration.org"
+      ]
+    },
+    {
+      "key": "jse",
+      "name": "Journal of Scientific Exploration",
+      "seed": "https://journalofscientificexploration.org/",
+      "category": "Unconventional science",
+      "tags": "anomalies consciousness physics psi",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ions",
+      "name": "Institute of Noetic Sciences",
+      "seed": "https://noetic.org/",
+      "category": "Consciousness / psi",
+      "tags": "consciousness meditation psi",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ian",
+      "name": "International Association for Near-Death Studies",
+      "seed": "https://iands.org/",
+      "category": "Consciousness / psi",
+      "tags": "near death nde consciousness",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "essentia",
+      "name": "Essentia Foundation",
+      "seed": "https://www.essentiafoundation.org/",
+      "category": "Consciousness / philosophy",
+      "tags": "idealism metaphysics consciousness",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "scientificmedical",
+      "name": "Scientific and Medical Network",
+      "seed": "https://scientificandmedical.net/",
+      "category": "Consciousness / philosophy",
+      "tags": "consciousness science philosophy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "monroe",
+      "name": "Monroe Institute",
+      "seed": "https://www.monroeinstitute.org/",
+      "category": "Consciousness / psi",
+      "tags": "consciousness meditation altered states",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "sacred",
+      "name": "Internet Sacred Text Archive",
+      "seed": "https://sacred-texts.com/",
+      "category": "Esoteric / religion",
+      "tags": "religion myth magic esoteric occult",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "theosophy",
+      "name": "Theosophical Society archive",
+      "seed": "https://www.theosociety.org/",
+      "category": "Esoteric / religion",
+      "tags": "theosophy occult esoteric religion",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "hermetic",
+      "name": "Hermetic Library",
+      "seed": "https://hermetic.com/",
+      "category": "Esoteric / religion",
+      "tags": "hermetic occult magic alchemy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "esoteric",
+      "name": "Esoteric Archives",
+      "seed": "https://www.esotericarchives.com/",
+      "category": "Esoteric / religion",
+      "tags": "grimoires magic alchemy occult",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "gnosis",
+      "name": "Gnosis Archive",
+      "seed": "https://gnosis.org/",
+      "category": "Esoteric / religion",
+      "tags": "gnostic religion scripture",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "holybooks",
+      "name": "Holy Books",
+      "seed": "https://holybooks.com/",
+      "category": "Esoteric / religion",
+      "tags": "religion buddhism meditation philosophy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ccel",
+      "name": "Christian Classics Ethereal Library",
+      "seed": "https://www.ccel.org/",
+      "category": "Religion / history",
+      "tags": "christian theology church bible",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "buddhanet",
+      "name": "BuddhaNet",
+      "seed": "https://www.buddhanet.net/",
+      "category": "Religion / philosophy",
+      "tags": "buddhism meditation dharma",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "buddhanet.net"
+      ]
+    },
+    {
+      "key": "accesstoinsight",
+      "name": "Access to Insight",
+      "seed": "https://www.accesstoinsight.org/",
+      "category": "Religion / philosophy",
+      "tags": "buddhism sutta meditation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "suttacentral",
+      "name": "SuttaCentral",
+      "seed": "https://suttacentral.net/",
+      "category": "Religion / philosophy",
+      "tags": "buddhism scripture sutta",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "bahai",
+      "name": "Baháʼí Reference Library",
+      "seed": "https://www.bahai.org/library/",
+      "category": "Religion / philosophy",
+      "tags": "bahai religion scripture",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "quran",
+      "name": "Quranic Arabic Corpus",
+      "seed": "https://corpus.quran.com/",
+      "category": "Religion / linguistics",
+      "tags": "quran arabic religion",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "mises",
+      "name": "Mises Institute",
+      "seed": "https://mises.org/",
+      "category": "Economics / think tanks",
+      "tags": "economics money liberty austrian banking",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "cdn.mises.org"
+      ]
+    },
+    {
+      "key": "fee",
+      "name": "Foundation for Economic Education",
+      "seed": "https://fee.org/",
+      "category": "Economics / think tanks",
+      "tags": "economics liberty markets",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "cato",
+      "name": "Cato Institute",
+      "seed": "https://www.cato.org/",
+      "category": "Politics / think tanks",
+      "tags": "politics liberty economics policy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "heritage",
+      "name": "Heritage Foundation",
+      "seed": "https://www.heritage.org/",
+      "category": "Politics / think tanks",
+      "tags": "politics government policy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "cepr",
+      "name": "Center for Economic and Policy Research",
+      "seed": "https://cepr.net/",
+      "category": "Economics / think tanks",
+      "tags": "economics labor inequality policy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "epi",
+      "name": "Economic Policy Institute",
+      "seed": "https://www.epi.org/",
+      "category": "Economics / think tanks",
+      "tags": "labor economics wages inequality",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "levy",
+      "name": "Levy Economics Institute",
+      "seed": "https://www.levyinstitute.org/",
+      "category": "Economics / think tanks",
+      "tags": "money banking economics",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "demos",
+      "name": "Demos",
+      "seed": "https://www.demos.org/",
+      "category": "Politics / think tanks",
+      "tags": "democracy politics inequality",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "tni",
+      "name": "Transnational Institute",
+      "seed": "https://www.tni.org/",
+      "category": "Geopolitics / independent",
+      "tags": "geopolitics corporate power trade",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ips",
+      "name": "Institute for Policy Studies",
+      "seed": "https://ips-dc.org/",
+      "category": "Geopolitics / independent",
+      "tags": "politics peace inequality",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "brookings",
+      "name": "Brookings Institution",
+      "seed": "https://www.brookings.edu/",
+      "category": "Politics / think tanks",
+      "tags": "government policy economics",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "rand",
+      "name": "RAND",
+      "seed": "https://www.rand.org/",
+      "category": "Military / policy",
+      "tags": "military strategy security policy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "csis",
+      "name": "Center for Strategic and International Studies",
+      "seed": "https://www.csis.org/",
+      "category": "Geopolitics / think tanks",
+      "tags": "geopolitics military china security",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "carnegie",
+      "name": "Carnegie Endowment for International Peace",
+      "seed": "https://carnegieendowment.org/",
+      "category": "Geopolitics / think tanks",
+      "tags": "foreign policy international security",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "chatham",
+      "name": "Chatham House",
+      "seed": "https://www.chathamhouse.org/",
+      "category": "Geopolitics / think tanks",
+      "tags": "international relations geopolitics",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "crisis",
+      "name": "International Crisis Group",
+      "seed": "https://www.crisisgroup.org/",
+      "category": "Geopolitics / nonprofit",
+      "tags": "conflict war peace geopolitics",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "sipri",
+      "name": "Stockholm International Peace Research Institute",
+      "seed": "https://www.sipri.org/",
+      "category": "Military / independent",
+      "tags": "arms military conflict peace",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "fas",
+      "name": "Federation of American Scientists",
+      "seed": "https://fas.org/",
+      "category": "Military / independent",
+      "tags": "nuclear intelligence military security",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "arms",
+      "name": "Arms Control Association",
+      "seed": "https://www.armscontrol.org/",
+      "category": "Military / independent",
+      "tags": "arms nuclear missiles treaties",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "nti",
+      "name": "Nuclear Threat Initiative",
+      "seed": "https://www.nti.org/",
+      "category": "Military / nonprofit",
+      "tags": "nuclear weapons security",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "icij",
+      "name": "International Consortium of Investigative Journalists",
+      "seed": "https://www.icij.org/",
+      "category": "Investigative journalism",
+      "tags": "offshore corruption finance investigation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "propublica",
+      "name": "ProPublica",
+      "seed": "https://www.propublica.org/",
+      "category": "Investigative journalism",
+      "tags": "investigation corruption accountability",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "bellingcat",
+      "name": "Bellingcat",
+      "seed": "https://www.bellingcat.com/",
+      "category": "Investigative journalism",
+      "tags": "osint investigation conflict",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "hrw",
+      "name": "Human Rights Watch",
+      "seed": "https://www.hrw.org/",
+      "category": "Nonprofit / reports",
+      "tags": "human rights conflict detention",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "amnesty",
+      "name": "Amnesty International",
+      "seed": "https://www.amnesty.org/",
+      "category": "Nonprofit / reports",
+      "tags": "human rights detention repression",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "transparency",
+      "name": "Transparency International",
+      "seed": "https://www.transparency.org/",
+      "category": "Nonprofit / reports",
+      "tags": "corruption transparency governance",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "eff",
+      "name": "Electronic Frontier Foundation",
+      "seed": "https://www.eff.org/",
+      "category": "Nonprofit / technology",
+      "tags": "surveillance privacy internet freedom",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "aclu",
+      "name": "American Civil Liberties Union",
+      "seed": "https://www.aclu.org/",
+      "category": "Nonprofit / law",
+      "tags": "rights privacy surveillance law",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "epic",
+      "name": "Electronic Privacy Information Center",
+      "seed": "https://epic.org/",
+      "category": "Nonprofit / technology",
+      "tags": "privacy surveillance data",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "citizenlab",
+      "name": "Citizen Lab",
+      "seed": "https://citizenlab.ca/",
+      "category": "Independent / technology",
+      "tags": "surveillance spyware censorship",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "privacyinternational",
+      "name": "Privacy International",
+      "seed": "https://privacyinternational.org/",
+      "category": "Nonprofit / technology",
+      "tags": "privacy surveillance data",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "nsarchive",
+      "name": "National Security Archive",
+      "seed": "https://nsarchive.gwu.edu/",
+      "category": "Declassified / independent",
+      "tags": "intelligence declassified diplomacy military",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "muckrock",
+      "name": "MuckRock",
+      "seed": "https://www.muckrock.com/",
+      "category": "FOIA / independent",
+      "tags": "foia government records investigation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "cia",
+      "name": "CIA Reading Room",
+      "seed": "https://www.cia.gov/readingroom/",
+      "category": "Declassified / government",
+      "tags": "intelligence foia mkultra covert",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "nara",
+      "name": "National Archives",
+      "seed": "https://www.archives.gov/",
+      "category": "Archives / government",
+      "tags": "archives history records declassified",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "fbi",
+      "name": "FBI Vault",
+      "seed": "https://vault.fbi.gov/",
+      "category": "Declassified / government",
+      "tags": "fbi records surveillance investigation",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "dod",
+      "name": "Department of Defense historical office",
+      "seed": "https://history.defense.gov/",
+      "category": "Military / government",
+      "tags": "military history defense",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "army",
+      "name": "Army University Press",
+      "seed": "https://www.armyupress.army.mil/",
+      "category": "Military / government",
+      "tags": "military strategy doctrine history",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "naval",
+      "name": "Naval History and Heritage Command",
+      "seed": "https://www.history.navy.mil/",
+      "category": "Military / government",
+      "tags": "navy military history",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "airforce",
+      "name": "Air University Press",
+      "seed": "https://www.airuniversity.af.edu/AUPress/",
+      "category": "Military / government",
+      "tags": "air force military strategy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "govinfo",
+      "name": "GovInfo",
+      "seed": "https://www.govinfo.gov/",
+      "category": "Government / records",
+      "tags": "legislation hearings congressional reports",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "federalreserve",
+      "name": "Federal Reserve research",
+      "seed": "https://www.federalreserve.gov/",
+      "category": "Economics / government",
+      "tags": "monetary economics banking",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "bis",
+      "name": "Bank for International Settlements",
+      "seed": "https://www.bis.org/",
+      "category": "Economics / international",
+      "tags": "banking monetary finance",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "imf",
+      "name": "International Monetary Fund",
+      "seed": "https://www.imf.org/",
+      "category": "Economics / international",
+      "tags": "economics finance debt",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "worldbank",
+      "name": "World Bank Open Knowledge Repository",
+      "seed": "https://openknowledge.worldbank.org/",
+      "category": "Economics / international",
+      "tags": "development economics poverty",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "un",
+      "name": "United Nations Digital Library",
+      "seed": "https://digitallibrary.un.org/",
+      "category": "International / records",
+      "tags": "international diplomacy treaties",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "unesco",
+      "name": "UNESCO Digital Library",
+      "seed": "https://unesdoc.unesco.org/",
+      "category": "International / records",
+      "tags": "education heritage culture",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "who",
+      "name": "WHO Institutional Repository",
+      "seed": "https://iris.who.int/",
+      "category": "Health / international",
+      "tags": "medicine health public health",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "marxists",
+      "name": "Marxists Internet Archive",
+      "seed": "https://www.marxists.org/",
+      "category": "Political theory / archive",
+      "tags": "marx socialism communism economics",
+      "adapter": "crawl",
+      "extra_hosts": [
+        "marxists.org"
+      ]
+    },
+    {
+      "key": "anarchist",
+      "name": "The Anarchist Library",
+      "seed": "https://theanarchistlibrary.org/",
+      "category": "Political theory / archive",
+      "tags": "anarchism political theory",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "oll",
+      "name": "Online Library of Liberty",
+      "seed": "https://oll.libertyfund.org/",
+      "category": "Philosophy / archive",
+      "tags": "liberty philosophy political theory",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "gutenberg",
+      "name": "Project Gutenberg",
+      "seed": "https://www.gutenberg.org/",
+      "category": "Books / public domain",
+      "tags": "books literature history philosophy",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "pdr",
+      "name": "Public Domain Review",
+      "seed": "https://publicdomainreview.org/",
+      "category": "History / independent",
+      "tags": "history books art archives",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "hathi",
+      "name": "HathiTrust",
+      "seed": "https://www.hathitrust.org/",
+      "category": "Books / archive",
+      "tags": "books history digitized",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "biodiversity",
+      "name": "Biodiversity Heritage Library",
+      "seed": "https://www.biodiversitylibrary.org/",
+      "category": "History / science",
+      "tags": "natural history biology",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "wellcome",
+      "name": "Wellcome Collection",
+      "seed": "https://wellcomecollection.org/",
+      "category": "History / medicine",
+      "tags": "medicine history health",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "smithsonian",
+      "name": "Smithsonian Libraries",
+      "seed": "https://library.si.edu/",
+      "category": "History / science",
+      "tags": "history science archaeology",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "worldhistory",
+      "name": "World History Encyclopedia",
+      "seed": "https://www.worldhistory.org/",
+      "category": "History / independent",
+      "tags": "ancient history archaeology",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "archaeology",
+      "name": "Archaeological Institute of America",
+      "seed": "https://www.archaeological.org/",
+      "category": "Archaeology / nonprofit",
+      "tags": "archaeology ancient history",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "ancientorigins",
+      "name": "Ancient Origins",
+      "seed": "https://www.ancient-origins.net/",
+      "category": "Alternative archaeology",
+      "tags": "ancient archaeology civilizations",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "graham",
+      "name": "Graham Hancock archive",
+      "seed": "https://grahamhancock.com/",
+      "category": "Alternative archaeology",
+      "tags": "archaeology ancient civilizations",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "thunderbolts",
+      "name": "Thunderbolts Project",
+      "seed": "https://www.thunderbolts.info/",
+      "category": "Unconventional science",
+      "tags": "electric universe plasma cosmology",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "aether",
+      "name": "Aetherometry",
+      "seed": "https://www.aetherometry.com/",
+      "category": "Unconventional science",
+      "tags": "physics aether electricity",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "openlibrary",
+      "name": "Open Library",
+      "seed": "https://openlibrary.org/",
+      "category": "Books / archive",
+      "tags": "books literature history",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "internetarchive",
+      "name": "Internet Archive",
+      "seed": "https://archive.org/",
+      "category": "Books / broad archive",
+      "tags": "books archives history independent",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "zenodo",
+      "name": "Zenodo open repository",
+      "seed": "https://zenodo.org/",
+      "category": "Broad research / repositories",
+      "tags": "research science reports data",
+      "adapter": "zenodo",
+      "extra_hosts": []
+    },
+    {
+      "key": "osf",
+      "name": "Open Science Framework",
+      "seed": "https://osf.io/",
+      "category": "Broad research / repositories",
+      "tags": "research preprints science",
+      "adapter": "crawl",
+      "extra_hosts": []
+    },
+    {
+      "key": "figshare",
+      "name": "Figshare",
+      "seed": "https://figshare.com/",
+      "category": "Broad research / repositories",
+      "tags": "research reports papers",
+      "adapter": "crawl",
+      "extra_hosts": []
+    }
+  ]
+}

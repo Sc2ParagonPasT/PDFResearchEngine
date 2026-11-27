@@ -10,6 +10,7 @@ from pathlib import Path
 from desktop_helpers import safe_pdf_name, export_folder, load_preferences, save_preferences
 from discovery_v03 import Network, VERIFIED, run_search
 from catalog_v04 import CATALOG, BY_KEY, Index, search_catalog
+import catalog_v04 as catalog
 from reader_v04 import ReaderWindow
 from security import Pipeline, Blocked
 
@@ -116,6 +117,11 @@ def desktop_class(Base):
         def layout(self):
             super().layout()
             self.reader=None
+            self.catalog_file=self.root/'source-catalog-v04.json'
+            self.catalog_backup=self.root/'source-catalog-v04.previous.json'
+            if self.catalog_file.is_file():
+                try:catalog.apply_manifest(load_preferences(self.catalog_file))
+                except (OSError,ValueError,TypeError):pass
             self.catalog_index=Index(self.root/'discovery-v04.sqlite3')
             self.catalog_keys=set(self.prefs.get('catalog_enabled',[]))&set(BY_KEY)
             self.win.title('PDF Research Engine | v0.4 development')
@@ -213,7 +219,8 @@ def desktop_class(Base):
             if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalogwin.lift();return
             w=self.catalogwin=tk.Toplevel(self.win);w.title('Built-in Source Catalog');w.geometry('1050x680');w.configure(bg=BG)
             f=ttk.Frame(w,padding=12);f.pack(fill='both',expand=True)
-            ttk.Label(f,text=f'{len(CATALOG)} collection candidates • operational status varies',style='Title.TLabel',wraplength=980).pack(anchor='w')
+            heading=tk.StringVar()
+            ttk.Label(f,textvariable=heading,style='Title.TLabel',wraplength=980).pack(anchor='w')
             ttk.Label(f,text='Choose collections once. Search automatically prioritizes up to eight relevant enabled collections per query in addition to the established search adapters. A reachable PDF is not yet security-screened.',wraplength=980).pack(fill='x',pady=6)
             query=tk.StringVar();ttk.Entry(f,textvariable=query).pack(fill='x')
             frame=ttk.Frame(f);frame.pack(fill='both',expand=True,pady=6)
@@ -223,13 +230,14 @@ def desktop_class(Base):
             tree.pack(side='left',fill='both',expand=True)
             sb=ttk.Scrollbar(frame,command=tree.yview);sb.pack(side='right',fill='y');tree.configure(yscrollcommand=sb.set)
             def refresh(*_):
+                heading.set(f'Catalog v{catalog.ACTIVE_VERSION} • {len(CATALOG)} collection candidates')
                 tree.delete(*tree.get_children());states=self.catalog_index.states()
                 for source in CATALOG:
                     if query.get().lower() not in (source.name+' '+source.category+' '+source.tags).lower():continue
                     state=states.get(source.key)
                     status=state[3] if state else 'Not validated'
                     tree.insert('','end',iid=source.key,values=(source.name,source.category,'Yes' if source.key in self.catalog_keys else 'No',status))
-            query.trace_add('write',refresh);refresh()
+            query.trace_add('write',refresh);refresh();self.catalog_refresh=refresh
             def enable(keys):
                 if self.busy:messagebox.showinfo('Busy','Wait until the current operation finishes.',parent=w);return
                 keys=set(keys)&set(BY_KEY)
@@ -259,6 +267,40 @@ def desktop_class(Base):
             ttk.Button(buttons,text='Enable selected',command=lambda:enable(tree.selection())).pack(side='left',padx=5)
             ttk.Button(buttons,text='Disable selected',command=disable).pack(side='left')
             ttk.Button(buttons,text='Refresh status',command=refresh).pack(side='right')
+            updates=ttk.Frame(f);updates.pack(fill='x',pady=3)
+            ttk.Button(updates,text='Update Sources',command=self.update_catalog).pack(side='left')
+            ttk.Button(updates,text='Restore Previous Catalog',command=self.restore_catalog).pack(side='left',padx=5)
+            ttk.Label(updates,text='Data-only updates from the project GitHub repository').pack(side='left',padx=5)
+        def update_catalog(self):
+            if self.busy:messagebox.showinfo('Busy','Finish the current operation first.');return
+            def work():
+                try:self.events.put(('catalog_update',catalog.fetch_manifest()))
+                except Exception as e:self.events.put(('catalog_error',str(e)))
+            self.start(work)
+        def apply_catalog_update(self,data):
+            version,sources=catalog.parse_manifest(data)
+            if version<=catalog.ACTIVE_VERSION:
+                messagebox.showinfo('Source Catalog','The current catalog is up to date.');return
+            if not messagebox.askyesno('Source Catalog',f'Install catalog version {version} with {len(sources)} collections? New domain permissions will not be added automatically.'):return
+            try:
+                previous=load_preferences(self.catalog_file) if self.catalog_file.is_file() else catalog.bundled_manifest()
+                catalog.parse_manifest(previous)
+                save_preferences(self.catalog_backup,previous)
+                save_preferences(self.catalog_file,data)
+                catalog.apply_manifest(data)
+                self.catalog_keys.intersection_update(BY_KEY);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist()
+                if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalog_refresh()
+            except Exception as e:messagebox.showerror('Source Catalog',str(e))
+        def restore_catalog(self):
+            if self.busy:return
+            if not self.catalog_backup.is_file():messagebox.showinfo('Source Catalog','No previous catalog is stored.');return
+            if not messagebox.askyesno('Source Catalog','Restore the previous catalog? Existing domain permissions remain unchanged.'):return
+            try:
+                previous=load_preferences(self.catalog_backup);catalog.parse_manifest(previous)
+                save_preferences(self.catalog_file,previous);catalog.apply_manifest(previous,allow_rollback=True)
+                self.catalog_keys.intersection_update(BY_KEY);self.prefs['catalog_enabled']=sorted(self.catalog_keys);self.persist()
+                if getattr(self,'catalogwin',None) and self.catalogwin.winfo_exists():self.catalog_refresh()
+            except Exception as e:messagebox.showerror('Source Catalog',str(e))
         def search(self):
             if self.busy:messagebox.showinfo('Busy','Wait for the current operation or click Stop.');return
             if self.generated_query!=self.q.get() or self.generated_depth!=self.depth.get():self.generate()
@@ -366,6 +408,8 @@ def desktop_class(Base):
                     k,v=self.events.get_nowait()
                     if k.startswith('batch_'):
                         if self.monitor:self.monitor.event(k,v)
+                    elif k=='catalog_update':self.apply_catalog_update(v)
+                    elif k=='catalog_error':messagebox.showerror('Catalog update failed',str(v))
                     elif k.startswith('reader_'):
                         if self.reader:self.reader.event(k,v)
                     elif k=='saved_folder':

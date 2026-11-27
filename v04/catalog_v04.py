@@ -3,6 +3,9 @@ Entries are research candidates, not endorsements or verified live integrations.
 No downloaded catalog can run code. Every result uses the v0.3 URL/PDF gate.
 """
 import collections
+import base64
+import hashlib
+from contextlib import closing
 import concurrent.futures as cf
 import dataclasses
 import json
@@ -152,8 +155,66 @@ def builtin():
         checked_url(seed,exact_hosts(s.hosts));out.append(s)
     if len({s.key for s in out})!=len(out):raise ValueError('Duplicate catalog id')
     return tuple(out)
-CATALOG=builtin()
+CATALOG=list(builtin())
 BY_KEY={s.key:s for s in CATALOG}
+ACTIVE_VERSION=CATALOG_VERSION
+CATALOG_URL='https://api.github.com/repos/Sc2ParagonPasT/PDFResearchEngine/contents/catalog/sources.json?ref=main'
+MAX_CATALOG_BYTES=1_000_000
+
+def parse_manifest(data):
+    if not isinstance(data,dict) or type(data.get('version')) is not int or not 1<=data['version']<=1_000_000:
+        raise ValueError('Invalid catalog version')
+    records=data.get('sources')
+    if not isinstance(records,list) or not 1<=len(records)<=5000:
+        raise ValueError('Invalid catalog size')
+    seen=set();sources=[]
+    for item in records:
+        if not isinstance(item,dict) or set(item)!={'key','name','seed','category','tags','adapter','extra_hosts'}:
+            raise ValueError('Invalid collection record schema')
+        for field,limit in [('key',50),('name',180),('seed',1000),('category',100),('tags',300),('adapter',20)]:
+            v=item[field]
+            if not isinstance(v,str) or not 1<=len(v)<=limit or any(ord(ch)<32 or ord(ch)==127 for ch in v):raise ValueError('Invalid '+field)
+        key=item['key']
+        if not re.fullmatch('[a-z0-9-]{1,50}',key) or key in seen:raise ValueError('Invalid or duplicate source key')
+        seen.add(key)
+        if item['adapter'] not in ('crawl','zenodo'):raise ValueError('Executable or unknown catalog adapter prohibited')
+        extras=item['extra_hosts']
+        if not isinstance(extras,list) or len(extras)>8 or any(not isinstance(x,str) for x in extras):raise ValueError('Invalid extra host list')
+        source=Source(key,item['name'],item['seed'],item['category'],item['tags'],item['adapter'],tuple(extras))
+        checked_url(source.seed,exact_hosts(source.hosts))
+        if source.adapter=='zenodo' and (source.seed!='https://zenodo.org/' or set(source.hosts)!={'zenodo.org'}):
+            raise ValueError('Zenodo adapter restricted to fixed official host')
+        sources.append(source)
+    return data['version'],sources
+
+def apply_manifest(data,allow_rollback=False):
+    global ACTIVE_VERSION
+    version,sources=parse_manifest(data)
+    if version<ACTIVE_VERSION and not allow_rollback:raise ValueError('Catalog downgrade denied')
+    CATALOG[:]=sources;BY_KEY.clear();BY_KEY.update({s.key:s for s in sources});ACTIVE_VERSION=version
+    return version
+
+def bundled_manifest():
+    return {'version':CATALOG_VERSION,'sources':[dict(dataclasses.asdict(s),extra_hosts=list(s.extra_hosts)) for s in builtin()]}
+
+def fetch_manifest(net=None):
+    # Fixed public repository API over the existing pinned HTTPS transport.
+    # This authenticates the GitHub origin and verifies the advertised blob identity;
+    # it is not an independent maintainer signature.
+    from discovery_v03 import Network
+    net=net or Network(['api.github.com'])
+    metadata=net.json(CATALOG_URL)
+    if metadata.get('path')!='catalog/sources.json' or metadata.get('encoding')!='base64' or metadata.get('type')!='file':
+        raise ValueError('Unexpected catalog origin metadata')
+    encoded=metadata.get('content')
+    if not isinstance(encoded,str) or len(encoded)>1_500_000:raise ValueError('Catalog payload outside limit')
+    data=base64.b64decode(encoded.replace('\n',''),validate=True)
+    if not 0<len(data)<=MAX_CATALOG_BYTES or metadata.get('size')!=len(data):raise ValueError('Catalog length mismatch')
+    blob=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+    if blob!=metadata.get('sha'):raise ValueError('Catalog blob integrity mismatch')
+    manifest=json.loads(data.decode('utf-8'));parse_manifest(manifest)
+    return manifest
+
 def words(value):return set(re.findall(r'[^\W_]{3,}',str(value).lower()))-{'the','and','for','with','research','papers','paper','study','studies','pdf','document','documents'}
 def score(query,value):return len(words(query)&words(value))
 def choose_sources(keys,terms,limit=8):
@@ -169,23 +230,23 @@ class Index:
     """Only URL/title/source metadata, not original documents. Cached results are re-probed."""
     def __init__(self,path):
         self.path=Path(path)
-        with sqlite3.connect(self.path) as c:
+        with closing(sqlite3.connect(self.path)) as c,c:
             c.execute('CREATE TABLE IF NOT EXISTS links(url TEXT PRIMARY KEY,title TEXT,source TEXT,query TEXT,verified INTEGER)')
             c.execute('CREATE TABLE IF NOT EXISTS source_state(source TEXT PRIMARY KEY,checked INTEGER,reachable INTEGER,downloaded INTEGER,detail TEXT)')
     def remember(self,r,key):
-        with sqlite3.connect(self.path,timeout=10) as c:
+        with closing(sqlite3.connect(self.path,timeout=10)) as c,c:
             c.execute('INSERT OR REPLACE INTO links VALUES (?,?,?,?,?)',(r.url,r.title,key,r.query,int(time.time())))
             c.execute('DELETE FROM links WHERE rowid IN (SELECT rowid FROM links ORDER BY verified DESC LIMIT -1 OFFSET 50000)')
     def matches(self,key,query,limit=6):
-        with sqlite3.connect(self.path) as c:
+        with closing(sqlite3.connect(self.path)) as c,c:
             rows=c.execute('SELECT url,title,query FROM links WHERE source=? ORDER BY verified DESC LIMIT 2000',(key,)).fetchall()
         rows=sorted((r for r in rows if score(query,r[1]+' '+r[0])),key=lambda r:-score(query,r[1]+' '+r[0]))
         return rows[:limit]
     def state(self,key,n,detail,downloaded=0):
-        with sqlite3.connect(self.path,timeout=10) as c:
+        with closing(sqlite3.connect(self.path,timeout=10)) as c,c:
             c.execute('INSERT OR REPLACE INTO source_state VALUES(?,?,?,?,?)',(key,int(time.time()),n,downloaded,detail[:180]))
     def states(self):
-        with sqlite3.connect(self.path) as c:
+        with closing(sqlite3.connect(self.path)) as c,c:
             return {x[0]:x[1:] for x in c.execute('SELECT * FROM source_state')}
 
 def xml_root(data):
@@ -297,7 +358,8 @@ def search_catalog(net,keys,terms,index,stop,emit,seen):
     with cf.ThreadPoolExecutor(max_workers=3) as pool:
         futures=[pool.submit(work,s) for s in sources]
         for i,f in enumerate(cf.as_completed(futures),1):
-            source,found,detail=f.result()
+            try:source,found,detail=f.result()
+            except Exception as e:emit('log','Collection task failed: '+str(e)[:160]);continue
             index.state(source.key,len(found),detail)
             if not stop.is_set():
                 for r in found:

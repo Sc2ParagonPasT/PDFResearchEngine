@@ -30,5 +30,16 @@ class CatalogTests(unittest.TestCase):
             idx=Index(Path(td)/'index.db');idx.remember(Result('History report','https://example.org/history.pdf','Example','','history'),'test')
             self.assertEqual(idx.matches('test','history')[0][0],'https://example.org/history.pdf')
             self.assertEqual(idx.matches('test','math'),[])
+    def test_catalog_manifest_and_blob_validation(self):
+        import base64,hashlib,json
+        manifest=bundled_manifest();version,sources=parse_manifest(manifest)
+        self.assertEqual(version,1);self.assertEqual(len(sources),len(CATALOG))
+        data=json.dumps(manifest).encode();metadata={'path':'catalog/sources.json','encoding':'base64','type':'file','size':len(data),'sha':hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest(),'content':base64.b64encode(data).decode()}
+        net=Network(['api.github.com'])
+        with patch.object(net,'json',return_value=metadata):self.assertEqual(fetch_manifest(net),manifest)
+        with patch.object(net,'json',return_value=dict(metadata,sha='0'*40)):
+            with self.assertRaises(ValueError):fetch_manifest(net)
+        manifest['sources'][0]['adapter']='arbitrary-code'
+        with self.assertRaises(ValueError):parse_manifest(manifest)
     def test_xml_rejects_dtd(self):
         with self.assertRaises(ValueError):xml_root(b'<!DOCTYPE a><a/>')
