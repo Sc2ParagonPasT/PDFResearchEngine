@@ -7,6 +7,7 @@ on:
       - '.github/workflows/build-windows.yml'
       - 'patches/**'
       - 'ci/**'
+      - 'tools/**'
 permissions:
   contents: read
 concurrency:
@@ -30,6 +31,8 @@ jobs:
           if (Test-Path -LiteralPath 'PDF_Research_Engine_v0.2_source.zip') { $zip = 'PDF_Research_Engine_v0.2_source.zip' }
           if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9') { throw 'Source archive hash mismatch' }
           Expand-Archive -LiteralPath $zip -DestinationPath source
+          python tools/apply-clam-temp-fix.py 'source/PDF_Research_Engine_v0.2'
+          if ($LASTEXITCODE -ne 0) { throw 'ClamAV source patch failed' }
           Copy-Item -LiteralPath 'patches/diagnostics.py' -Destination 'source/PDF_Research_Engine_v0.2/diagnostics.py' -Force
           # PyInstaller resolves data paths relative to the generated spec, not the stage.
           $script = 'source/PDF_Research_Engine_v0.2/Build_Windows.ps1'
