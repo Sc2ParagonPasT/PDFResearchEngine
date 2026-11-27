@@ -35,15 +35,33 @@ class Tests(unittest.TestCase):
         with patch.object(base.Network,'json',side_effect=TimeoutError('timed out')) as get, patch('discovery_v03.time.sleep'):
             with self.assertRaises(TimeoutError): net.json('https://api.ies.ed.gov/eric/')
             self.assertEqual(get.call_count,2)
-    def test_pmc_no_guessed_links(self):
+    def test_official_oa_pdf_only_and_approval(self):
+        net=Network([*base.DEFAULT_HOSTS,*OA_HOSTS])
+        xml=b'<OA><records><record><link format="pdf" href="ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_pdf/a.pdf"/><link format="tgz" href="ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/a.tgz"/><link format="pdf" href="https://unapproved.example/a.pdf"/></record></records></OA>'
+        with patch.object(net,'bytes',return_value=xml) as fetch:
+            self.assertEqual(oa_pdf_links(net,'PMC123'),['https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_pdf/a.pdf'])
+            fetch.assert_called_once()
+        restricted=Network(['www.ebi.ac.uk'])
+        with patch.object(restricted,'bytes') as fetch:
+            self.assertEqual(oa_pdf_links(restricted,'PMC123'),[]);fetch.assert_not_called()
+        with patch.object(net,'bytes',return_value=b'<!DOCTYPE a><a/>'):
+            with self.assertRaises(ValueError): oa_pdf_links(net,'PMC123')
+    def test_nasa_paginates_past_metadata_only(self):
         net=Network(base.DEFAULT_HOSTS)
+        first={'results':[{'id':i,'title':'No PDF','downloads':[]} for i in range(40)]}
+        next_page={'results':[{'id':40,'title':'Report','downloads':[{'links':{'pdf':'/api/citations/40/downloads/a.pdf'}}]}]}
+        with patch.object(net,'json',side_effect=[first,next_page]) as get:
+            self.assertEqual([x.title for x in discover(net,'NASA NTRS','apollo')],['Report'])
+            self.assertIn('page.from=40',get.call_args_list[1].args[0])
+    def test_pmc_no_guessed_links(self):
+        net=Network([h for h in base.DEFAULT_HOSTS if h not in OA_HOSTS])
         with patch.object(net,'json',return_value={'resultList':{'result':[{'pmcid':'PMC123','title':'No PDF'},{'title':'Good','fullTextUrlList':{'fullTextUrl':[{'documentStyle':'pdf','availabilityCode':'OA','url':'https://europepmc.org/pdf'}]}}]}}):
             self.assertEqual([x.title for x in discover(net,'Europe PMC','health')],['Good'])
     def test_nasa_only_explicit_approved_pdf_links(self):
         net=Network(base.DEFAULT_HOSTS)
         with patch.object(net,'json',return_value={'results':[{'title':'Report','downloads':[{'links':{'pdf':'/api/citations/1/downloads/a.pdf'}},{'links':{'pdf':'https://unapproved.example/a.pdf'}}]},{'title':'No PDF','id':2}]}) as get:
             self.assertEqual([x.url for x in discover(net,'NASA NTRS','apollo')],['https://ntrs.nasa.gov/api/citations/1/downloads/a.pdf'])
-            self.assertIn('q=apollo&downloadsAvailable=true',get.call_args.args[0])
+            self.assertIn('q=apollo&page.size=40&page.from=0',get.call_args.args[0])
     def test_loc_only_explicit_approved_pdf_links(self):
         net=Network(base.DEFAULT_HOSTS)
         with patch.object(net,'json',return_value={'results':[{'title':'Report','resources':[{'pdf':'/a.pdf'},{'files':[[{'mimetype':'application/pdf','url':'https://unapproved.example/a.pdf'},{'mimetype':'text/html','url':'/b.pdf'}]]}]},{'title':'Private','access_restricted':True,'resources':[{'pdf':'/c.pdf'}]}]}):

@@ -8,7 +8,7 @@ from discovery_v03 import Network, run_search, DEFAULT_PROVIDERS, VERIFIED
 from engine import DEFAULT_HOSTS
 
 TOPICS = {'ERIC':'reading comprehension', 'NASA NTRS':'Apollo 11',
-          'Europe PMC':'malaria vaccine', 'Library of Congress':'civil war maps'}
+          'Europe PMC':'malaria vaccine', 'Library of Congress':'civil war history', 'arXiv':'information theory'}
 
 def check(provider, term):
     net=Network(DEFAULT_HOSTS)
@@ -44,10 +44,11 @@ def inspect_metadata():
     queries = [
         ('ERIC baseline','https://api.ies.ed.gov/eric/?'+urlencode({'search':'reading comprehension','format':'json','rows':3,'start':0})),
         ('ERIC expanded','https://api.ies.ed.gov/eric/?'+urlencode({'search':'reading comprehension','format':'json','rows':40,'start':0})),
-        ('NASA q + downloads filter','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','downloadsAvailable':'true','page.size':40,'page.from':0})),
+        ('NASA second page','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','page.size':40,'page.from':40})),
+        ('NASA fourth page','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','page.size':40,'page.from':120})),
         ('NASA q','https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':'Apollo 11','page.size':3})),
         ('Europe PMC','https://www.ebi.ac.uk/europepmc/webservices/rest/search?'+urlencode({'query':'malaria vaccine AND OPEN_ACCESS:Y','format':'json','pageSize':3,'resultType':'core'})),
-        ('Library of Congress','https://www.loc.gov/search/?'+urlencode({'fo':'json','q':'civil war maps','c':3,'fa':'access-restricted:false'})),
+        ('Library of Congress','https://www.loc.gov/search/?'+urlencode({'fo':'json','q':'civil war history','c':3,'fa':'access-restricted:false|online-format:pdf'})),
     ]
     def examine(entry):
         label,url=entry
@@ -70,7 +71,9 @@ def inspect_metadata():
             records=data.get('results') or (response.get('docs',[]) if isinstance(response,dict) else []) or (rl.get('result',[]) if isinstance(rl,dict) else [])
             out['records']=len(records) if isinstance(records,list) else type(records).__name__
             out['samples']=[]
-            for item in records[:3] if isinstance(records,list) else []:
+            if isinstance(records,list):
+                out['records_with_downloads']=sum(bool(x.get('downloads')) for x in records if isinstance(x,dict))
+            for item in (records[:3]+[x for x in records[3:] if isinstance(x,dict) and x.get('downloads')][:2]) if isinstance(records,list) else []:
                 if not isinstance(item,dict):continue
                 sample={'keys':list(item)[:60]}
                 for key in ('id','title','fulltext','pmcid','downloads','downloadsAvailable','fullTextUrlList','resources','access_restricted','stiType','distribution'):

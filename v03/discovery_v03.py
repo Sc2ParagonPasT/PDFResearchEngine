@@ -4,6 +4,7 @@ import collections
 import dataclasses
 import re
 import time
+import xml.etree.ElementTree as ET
 from urllib.parse import urlencode, urljoin, urlsplit
 import engine as base
 from engine import Result, checked_url, HEADER, MAX_PDF
@@ -49,6 +50,30 @@ class Network(base.Network):
             r.close(); c.close()
 
 
+OA_HOSTS = ('www.ncbi.nlm.nih.gov', 'ftp.ncbi.nlm.nih.gov')
+
+def oa_pdf_links(net, pmcid):
+    """Official public PMC OA service; only explicit PDF links, never archives or guessed paths."""
+    if not isinstance(pmcid, str) or not re.fullmatch(r'PMC[0-9]+', pmcid):
+        return []
+    if not all(host in net.hosts for host in OA_HOSTS):
+        return []
+    url = 'https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?' + urlencode({'id':pmcid})
+    data = net.bytes(url, 65536)
+    # This small metadata response needs no DTD or entity declarations.
+    if re.search(rb'<!\\s*(?:DOCTYPE|ENTITY)', data, re.I):
+        raise ValueError('Unexpected XML declaration')
+    links = []
+    for node in ET.fromstring(data).iter('link'):
+        if node.get('format') != 'pdf': continue
+        href = node.get('href', '')
+        p = urlsplit(href)
+        # The OA service advertises FTP paths. HTTPS is the same public file service.
+        if p.netloc == 'ftp.ncbi.nlm.nih.gov' and p.scheme in ('ftp','https') and p.path.startswith('/pub/pmc/') and p.path.lower().endswith('.pdf'):
+            links.append(checked_url('https://ftp.ncbi.nlm.nih.gov'+p.path, net.hosts))
+    return links[:3]
+
+
 def discover(net, provider, term):
     items = []
     def add(title, url, year=''):
@@ -68,21 +93,42 @@ def discover(net, provider, term):
                 add(d.get('title'),'https://files.eric.ed.gov/fulltext/'+ident+'.pdf',d.get('publicationdateyear'))
     elif provider == 'Europe PMC':
         data = net.json('https://www.ebi.ac.uk/europepmc/webservices/rest/search?'+urlencode({'query':'('+term+') AND OPEN_ACCESS:Y','format':'json','pageSize':15,'resultType':'core'}))
+        oa_checked=0
         for d in data.get('resultList',{}).get('result',[]):
+            # Prefer the public OA distribution service when the two exact hosts are approved.
+            if oa_checked<6 and d.get('pmcid') and all(h in net.hosts for h in OA_HOSTS):
+                oa_checked+=1
+                try:
+                    for u in oa_pdf_links(net,d['pmcid']):
+                        add(d.get('title'),u,d.get('pubYear'))
+                except (OSError,ValueError,ET.ParseError):
+                    pass
             for u in d.get('fullTextUrlList',{}).get('fullTextUrl',[]):
                 if str(u.get('documentStyle','')).lower()=='pdf' and str(u.get('availabilityCode','')).upper() in ('OA','F'):
                     add(d.get('title'),u.get('url'),d.get('pubYear'))
             # No speculative identifier-to-PDF URL construction.
     elif provider == 'NASA NTRS':
-        data = net.json('https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':term,'downloadsAvailable':'true','page.size':40,'page.from':0}))
-        for d in data.get('results',[]):
-            for download in d.get('downloads',[]) or []:
-                links = download.get('links') or {}
-                u = links.get('pdf') if isinstance(links,dict) else None
-                if isinstance(u,str):
-                    add(d.get('title'),urljoin('https://ntrs.nasa.gov/',u),str(d.get('publicationDate') or '')[:4])
+        # The live API ignored downloadsAvailable. Search successive result pages,
+        # then accept only the repository's own explicit PDF links.
+        seen_ids=set()
+        for offset in (0,40,80,120,160):
+            data = net.json('https://ntrs.nasa.gov/api/citations/search?'+urlencode({'q':term,'page.size':40,'page.from':offset}))
+            records=data.get('results',[])
+            if not records: break
+            before=len(seen_ids)
+            for d in records:
+                ident=d.get('id')
+                if ident is not None:
+                    if ident in seen_ids: continue
+                    seen_ids.add(ident)
+                for download in d.get('downloads',[]) or []:
+                    links = download.get('links') or {}
+                    u = links.get('pdf') if isinstance(links,dict) else None
+                    if isinstance(u,str):
+                        add(d.get('title'),urljoin('https://ntrs.nasa.gov/',u),str(d.get('publicationDate') or d.get('distributionDate') or '')[:4])
+            if len(items)>=8 or len(records)<40 or len(seen_ids)==before: break
     elif provider == 'Library of Congress':
-        data = net.json('https://www.loc.gov/search/?'+urlencode({'fo':'json','q':term,'c':10,'fa':'access-restricted:false'}))
+        data = net.json('https://www.loc.gov/search/?'+urlencode({'fo':'json','q':term,'c':10,'fa':'access-restricted:false|online-format:pdf'}))
         for d in data.get('results',[]):
             if d.get('access_restricted') is True:
                 continue

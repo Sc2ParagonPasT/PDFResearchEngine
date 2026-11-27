@@ -7,6 +7,13 @@ root = Path(sys.argv[1])
 overlay = Path(__file__).resolve().parent
 for name in ("discovery_v03.py", "test_discovery_v03.py", "live_retrieval.py"):
     shutil.copyfile(overlay / name, root / name)
+# New installations receive two exact official PMC OA host candidates.
+# Existing saved host lists remain untouched and must explicitly include them.
+engine = root / "engine.py"
+source = engine.read_text(encoding="utf-8")
+anchor = "'www.loc.gov','www.nasa.gov','ntrs.nasa.gov']"
+if source.count(anchor)!=1: raise RuntimeError("Unexpected default host list")
+engine.write_text(source.replace(anchor,"'www.loc.gov','www.nasa.gov','ntrs.nasa.gov','www.ncbi.nlm.nih.gov','ftp.ncbi.nlm.nih.gov']"),encoding="utf-8")
 p = root / "app.py"
 s = p.read_text(encoding="utf-8")
 changes = [
