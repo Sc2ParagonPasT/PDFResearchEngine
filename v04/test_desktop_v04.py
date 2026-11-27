@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from desktop_helpers import safe_pdf_name, unique_pdf_path, export_folder, load_preferences, save_preferences
 import security as s
-from test_security import PipelineTests, DERIVATIVE
+import test_security as fixtures
 
 class DesktopTests(unittest.TestCase):
     def test_windows_filename(self):
@@ -23,19 +23,19 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(export_folder(str(p/'missing')),p)
     def test_named_export_preserves_existing_file_and_rescans(self):
         # Use the existing controlled security fixture, not a mock export function.
-        fixture=PipelineTests();fixture.setUp()
+        fixture=fixtures.PipelineTests();fixture.setUp()
         try:
             evidence=fixture.accept();dest=fixture.root/'export';dest.mkdir()
             (dest/'Title.pdf').write_bytes(b'old')
             with patch('security.invoke',side_effect=fixture.mock_pass) as w:
                 path=fixture.pipe.export(evidence['output_sha256'],dest,title='Title')
             self.assertEqual(path.name,'Title (2).pdf')
-            self.assertEqual(path.read_bytes(),DERIVATIVE)
+            self.assertEqual(path.read_bytes(),fixtures.DERIVATIVE)
             self.assertEqual((dest/'Title.pdf').read_bytes(),b'old')
             self.assertIn('rescan',[c.args[0] for c in w.call_args_list])
         finally:fixture.doCleanups()
     def test_monitor_does_not_release_failed_scan(self):
-        fixture=PipelineTests();fixture.setUp()
+        fixture=fixtures.PipelineTests();fixture.setUp()
         try:
             events=[];pipe=s.Pipeline(fixture.root,progress=events.append)
             with patch('security.invoke',return_value={'verdict':'unavailable','reason':'scanner failed'}):

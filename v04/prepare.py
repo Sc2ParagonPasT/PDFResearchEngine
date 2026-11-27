@@ -33,4 +33,9 @@ s=change(s,"            r=invoke('rescan',self.root,folder)","            r=invo
 s=change(s,"    def export(self,digest,directory):","    def export(self,digest,directory,title=None):\n        from desktop_helpers import unique_pdf_path")
 s=change(s,"            target=Path(directory)/('PDFResearch_'+digest[:20]+'.pdf')","            target=Path(directory)/('PDFResearch_'+digest[:20]+'.pdf') if title is None else unique_pdf_path(directory,title)")
 p.write_text(s,encoding='utf-8')
+p=root/'test_security.py';s=p.read_text(encoding='utf-8')
+anchor="def rebuild(src,dest):dest.write_bytes(DERIVATIVE);return 'text',1,True"
+if s.count(anchor)!=2:raise RuntimeError('Expected two existing mocked reconstruction functions')
+s=s.replace(anchor,"def rebuild(src,dest,report=lambda *_:None):dest.write_bytes(DERIVATIVE);return 'text',1,True")
+p.write_text(s,encoding='utf-8')
 print('v0.4 desktop and security progress overlay applied.')
