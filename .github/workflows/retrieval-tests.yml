@@ -1,0 +1,45 @@
+name: v0.3 retrieval validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'v03/**'
+      - '.github/workflows/retrieval-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pdfresearch-v03-retrieval
+  cancel-in-progress: true
+jobs:
+  retrieval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original source and apply discovery overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip='PDF_Research_Engine_v0.2_source (1).zip'
+          if [[ -f PDF_Research_Engine_v0.2_source.zip ]]; then zip=PDF_Research_Engine_v0.2_source.zip; fi
+          echo "4925353d359a74679a838ef57e9f0d249b16a42f0431013ef1b387a4fa39b0a9  $zip" | sha256sum --check
+          unzip -q "$zip" -d source
+          python v03/prepare.py source/PDF_Research_Engine_v0.2
+          python -m compileall -q source/PDF_Research_Engine_v0.2
+      - name: Retrieval regression tests
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -m unittest -v test_engine test_discovery_v03
+      - name: Live repository discovery and full quarantine downloads
+        working-directory: source/PDF_Research_Engine_v0.2
+        run: python -u live_retrieval.py
+      - name: Preserve diagnostic report even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v03-live-retrieval-report
+          path: source/PDF_Research_Engine_v0.2/live-retrieval-results.json
+          if-no-files-found: warn
+          retention-days: 14
